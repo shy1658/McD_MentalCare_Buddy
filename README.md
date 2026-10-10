@@ -20,6 +20,11 @@
 
 ---
 
+## 🤖 这是一个 Skill
+
+**[`skill/SKILL.md`](skill/SKILL.md) 是本项目的大赛核心交付物** —— 情绪矩阵、MCP 调用顺序铁律、
+安全红线、降级策略都在里面。想直接看"它作为 Skill 怎么用"，从那里开始。
+
 ## ⚡ 30 秒上手（无需 Token、无需网络）
 
 ```bash
@@ -27,6 +32,7 @@ git clone https://github.com/<your-github-username>/McD_MentalCare_Buddy.git
 cd McD_MentalCare_Buddy
 
 python main.py "还有40个bug要改 我想死"
+# 等价于 Skill 入口：python skill/scripts/main.py "还有40个bug要改 我想死"
 ```
 
 就这么简单。**零第三方依赖**，默认走内置 Mock 数据，完整跑通从情绪识别到发疯文学的全链路。
@@ -202,6 +208,16 @@ query-my-account       campaign-calendar        order-list
 
 ```
 McD_MentalCare_Buddy/
+├── skill/                       # 🤖 WorkBuddy Skill 本体（大赛核心交付物，放最前）
+│   ├── SKILL.md                 # ⭐ Skill 主入口 —— 评审第一个看的
+│   ├── references/
+│   │   ├── mood-matrix.md       # 12 种情绪矩阵（由代码自动生成）
+│   │   ├── mcp-tools.md         # 15 个官方 Tool 速查 + 不用哪些及为什么
+│   │   ├── copywriting-bank.md  # 发疯文言语料库（由代码自动生成）
+│   │   └── safety-rules.md      # ⭐ 心理危机干预 + 安全红线
+│   └── scripts/
+│       ├── main.py              # Skill 入口（转发到根目录，单一实现源）
+│       └── gen_references.py    # 一键重新生成参考文档，避免文档与代码脱节
 ├── main.py                      # ⭐ CLI 主入口（放根目录，评委好找）
 ├── mcd_mood_buddy/
 │   ├── __init__.py
