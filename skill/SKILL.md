@@ -226,9 +226,19 @@ python <SKILL_DIR>/scripts/main.py "被气死了" --confirm        # ⚠️ 真�
 | 3 | **绝不本地算钱** | 金额一律取 `calculate-price` 返回值 |
 | 4 | **只读降级需显式开启** | 只有 `--auto-mock` 才降级，且计数进 `stats["mock_fallbacks"]` 可观测 |
 | 5 | **Mock 输出必须标明** | 输出顶部有「⚠️ 当前为离线演示模式」横幅 |
-| 6 | **心理危机优先于点餐** | 见 `references/safety-rules.md`，检测到自伤倾向先给援助热线，再谈吃什么 |
+| 6 | **心理危机优先于点餐** | ⭐ 已代码实现：`mcd_mood_buddy/safety.py` 在**任何 MCP 调用之前**短路 |
 
-> 第 6 条不是可选项。用户说「不想活了」时，**任何推荐都是不恰当的**。
+### 危机检测的三档（详见 `references/safety-rules.md`）
+
+| 档位 | 触发 | 行为 |
+|---|---|---|
+| `CRISIS` | 告别式 / 绝望 / 自伤词且无吐槽对象 | **短路**，零 MCP 调用，只给援助热线 |
+| `CONCERN` | 自伤词 + 明确吐槽语境（「改 bug 改到想死」） | 不阻断，附关怀与热线，**强制克制文体** |
+| `NONE` | — | 正常流程 |
+
+> 为什么不「见词就阻断」：加班吐槽里「想死」是高频修辞，
+> 每次都弹热线会让真正的求救被稀释。但**告别式表达永不降档**。
+> 第 6 条不是可选项——用户说「不想活了」时，**任何推荐都是不恰当的**。
 
 ---
 
@@ -249,10 +259,12 @@ python <SKILL_DIR>/scripts/main.py "被气死了" --confirm        # ⚠️ 真�
 ## 10. 测试
 
 ```bash
-python <ROOT>/tests/run_all.py       # 70 项断言，免 Token、免网络
+python <ROOT>/tests/run_all.py       # 125 项断言，免 Token、免网络
 ```
 
-三个套件：`test_smoke.py`（业务逻辑 27 项）、`test_live_transport.py`（本地假服务端验传输协议 30 项，含 429/404 故障注入）、`test_e2e_fake_server.py`（拟真服务端跑完整流程 13 项）。
+四个套件：`test_safety.py`（**心理危机干预 55 项，安全底线，失败即 P0**）、
+`test_smoke.py`（业务逻辑 27 项）、`test_live_transport.py`（本地假服务端验传输协议 30 项，含 429/404 故障注入）、
+`test_e2e_fake_server.py`（拟真服务端跑完整流程 13 项）。
 
 ---
 

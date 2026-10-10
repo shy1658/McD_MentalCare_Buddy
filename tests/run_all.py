@@ -19,6 +19,7 @@ HERE = Path(__file__).resolve().parent
 PY = sys.executable
 
 SUITES = [
+    ("安全层测试（心理危机干预）", "test_safety.py"),
     ("冒烟测试（业务逻辑）", "test_smoke.py"),
     ("传输层测试（MCP 协议）", "test_live_transport.py"),
     ("端到端测试（拟真服务端）", "test_e2e_fake_server.py"),

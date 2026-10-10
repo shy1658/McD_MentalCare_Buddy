@@ -44,7 +44,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-from mcd_mood_buddy import copywriting, renderer
+from mcd_mood_buddy import copywriting, renderer, safety
 from mcd_mood_buddy.annotation import annotate_menu, coverage_report
 from mcd_mood_buddy.deal_calculator import optimize
 from mcd_mood_buddy.mcp_client import build_client
@@ -56,6 +56,7 @@ from mcd_mood_buddy.mood_engine import (
     rank_items,
     score_bundle,
 )
+from mcd_mood_buddy.safety import CrisisLevel, detect_crisis
 
 # 每种情绪的方案命名（比「方案一/二/三」有记忆点得多）
 PLAN_NAMES: dict[str, list[str]] = {
@@ -153,6 +154,20 @@ def apply_time_filter(items, time_ctx: str):
 # ---------------------------------------------------------------------------
 
 
+def _inject_concern_banner(md: str, banner: str) -> str:
+    """
+    把 CONCERN 关怀横幅插到主标题之后、情绪诊断之前。
+
+    放在标题后而不是最前面，是为了让用户先看到"这是谁在说话"，
+    再看到关怀——凭空冒出一段热线会显得像报错。
+    """
+    lines = md.split("\n")
+    for i, ln in enumerate(lines):
+        if ln.startswith("# "):
+            return "\n".join(lines[: i + 1] + ["", banner.rstrip()] + lines[i + 1 :])
+    return banner + "\n" + md
+
+
 def run(
     text: str,
     budget: float | None = None,
@@ -174,6 +189,34 @@ def run(
             （**只对只读接口生效**，算价 / 下单永远不降级）
         verbose: 打印调用埋点到 stderr
     """
+
+    # ==================================================================
+    # 🛡️ 闸门 0：心理危机检测 —— 必须在任何 MCP 调用之前
+    # ==================================================================
+    # 为什么放最前面：一旦走到后面就会调 query-meals / auto-bind-coupons，
+    # 而「先给个推荐再顺便关心一下」本身就是错的。危机时系统该做的是闭嘴、
+    # 把真正能帮忙的人递过去。这个分支**不产生任何网络调用**。
+    crisis = detect_crisis(text)
+
+    if crisis.level is CrisisLevel.CRISIS:
+        if as_json:
+            return (
+                json.dumps(
+                    {
+                        "crisis": safety.to_dict(crisis),
+                        "recommendations": [],
+                        "order": None,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                None,
+            )
+        return safety.render_crisis_card(crisis, original_text=text), None
+
+    # CONCERN 档不阻断，但强制改用克制文体：
+    # 此时再给「我活着唯一的证据是订单号」这种自毁式幽默，等于拿痛苦开玩笑。
+    style = safety.recommended_style(crisis.level, style)
 
     client = build_client(
         mock=mock, fallback_to_mock=fallback_to_mock, verbose=verbose
@@ -338,6 +381,8 @@ def run(
     # --- 10. 输出 ---
     if as_json:
         payload = {
+            # 安全层结果始终带出，便于外部系统（如前端）自行决定是否提示
+            "crisis": safety.to_dict(crisis),
             "mood": {
                 "id": mood.mood_id,
                 "label": mood.label,
@@ -368,6 +413,10 @@ def run(
         return json.dumps(payload, ensure_ascii=False, indent=2), order
 
     md = renderer.render(recs, client_mode=mode, order=order, store_name=store.name if store else "")
+
+    # CONCERN 档：把关怀横幅插到最前面（在标题之后、情绪诊断之前）
+    if crisis.level is CrisisLevel.CONCERN:
+        md = _inject_concern_banner(md, safety.render_concern_banner(crisis))
 
     if verbose:
         # 埋点打到 stderr：不污染 stdout，方便 `python main.py ... --json | jq`
