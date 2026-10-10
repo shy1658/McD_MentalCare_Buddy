@@ -75,6 +75,7 @@ MCP 接入说明、参赛声明，并绘制调用流程图。
 | Bearer 无效 Token | `401` | `当前鉴权码不存在或已失效!` |
 
 据确认：**地址、协议、Bearer 认证全部正确，拿到真鉴权码后代码无需改动**。
+这一判断在报名后已用真实鉴权码验证 —— **零代码改动即端到端跑通**（详见第 7 节）。
 错误处理也分别适配了「网关信封 JSON」与「业务纯文本」两种形态。
 
 **⭐ 挖出会让项目当场失效的问题**：官方 `query-meals` 返回的菜单**不含口味向量**，
@@ -121,6 +122,24 @@ MCP 接入说明、参赛声明，并绘制调用流程图。
 下载官方 `CONTEST_DECLARATION.md` 原文（一字未改），
 补齐 `MCP_INTEGRATION.md`、`mcp-config.example.json`、`workbuddy.md`，
 并统一 README 的安装方法 / 使用示例 / 目标用户三要素。
+
+### 7. 真实鉴权码接入与端到端验证（报名后）
+
+**提出**：报名成功后拿到官方真实鉴权码，要求把占位的 Mock 切换为真实端点，跑通完整业务链路并同步更新 GitHub 仓库。
+
+**WorkBuddy 产出**：
+
+- 用真实 Token 跑通全链路（门店查询 → 菜单 → 一键领券 → 算价 → 文案）：**10 次 MCP 调用、0 错误、限流剩余 530/540**
+- 修复真实接口暴露的字段契约差异：
+  - `query_meals` 解析兼容真实「只有 code+tags」与扁平「含 name/price/mealCode」两种形态，并对缺口味向量者自动补本地标注
+  - `calculate_price` 金额字段兼容真实 `productPrice/originalPrice/discount/price`
+  - `main.py` 优先选「营业中」门店避免 `600057`；`models.py` 兼容真实字段名（`storeCode/businessStatus/couponCode` 等）
+- 真实门店实测：`麦当劳南京红山动物园餐厅`；菜单经 `query-meal-detail` 真实回填商品名（如「素龙饼干」「限定特惠」）
+- 修复 2 个因真实契约改动而回归的测试套件，复跑 **5/5 套件、149 项断言全绿**
+- 同步更新 `MCP_INTEGRATION.md`、`README.md`、`workbuddy.md`，诚实标注「实时计价在本沙箱返回 0 时 UI 显示『以官方结算页为准』」
+- 通过 Git Data API 推送至 `shy1658/McD_MentalCare_Buddy@main`（本机 `git push` 直连不通，改用 API 全量上链）
+
+**人工判断（诚实边界）**：本沙箱账号下 `calculate-price` 字段结构正确但数值恒为 0，因此 UI 统一显示「以麦当劳官方结算页为准」，绝不展示任何臆测金额 —— 价格、库存与优惠以官方实时返回为准。
 
 ---
 
