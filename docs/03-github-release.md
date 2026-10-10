@@ -73,7 +73,7 @@ gh repo create McD_MentalCare_Buddy \
   --push
 
 # 或手动
-git remote add origin https://github.com/<your-github-username>/McD_MentalCare_Buddy.git
+git remote add origin https://github.com/shy1658/McD_MentalCare_Buddy.git
 git branch -M main
 git push -u origin main
 ```

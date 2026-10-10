@@ -56,7 +56,7 @@
 **零第三方依赖** —— 只需要 Python 3.10+，不需要 `pip install` 任何东西。
 
 ```bash
-git clone https://github.com/<your-github-username>/McD_MentalCare_Buddy.git
+git clone https://github.com/shy1658/McD_MentalCare_Buddy.git
 cd McD_MentalCare_Buddy
 
 python --version          # 确认 ≥ 3.10
