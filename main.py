@@ -93,6 +93,47 @@ def _pick_by_category(ranked, keywords: tuple[str, ...], exclude_codes: set[str]
     return None
 
 
+def _enrich_names_live(client, recs, store_id: str, max_codes: int = 12) -> None:
+    """
+    live 模式下用 query-meal-detail 补足真实商品名。
+
+    真实 query-meals 只返回 code + tags + 分类，没有商品名；
+    名称只在 query-meal-detail 的 `name` 字段里。这里只给最终入选方案的
+    少量商品（最多 max_codes 个）补名，调用量很小，不会打满限流。
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    seen: set[str] = set()
+    codes: list[str] = []
+    all_named = True
+    for r in recs:
+        for ln in r.lines:
+            if ln.item.code and ln.item.code not in seen:
+                seen.add(ln.item.code)
+                codes.append(ln.item.code)
+            if not ln.item.name:
+                all_named = False
+    codes = codes[:max_codes]
+    # 菜单已自带真实商品名（如拟真/测试服务端返回扁平格式）则无需再调 query-meal-detail
+    if not codes or all_named:
+        return
+
+    def fetch(code: str):
+        try:
+            d = client.query_meal_detail(code, store_id)
+            return code, (d or {}).get("name") or ""
+        except Exception:
+            return code, ""
+
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        res = dict(ex.map(fetch, codes))
+    for r in recs:
+        for ln in r.lines:
+            nm = res.get(ln.item.code)
+            if nm:
+                ln.item.name = nm
+
+
 def build_bundles(ranked, mood) -> list[tuple[str, list[CartLine]]]:
     """
     把打分后的商品组装成 3 个候选方案。
@@ -224,6 +265,11 @@ def run(
     mode = "mock" if client.mock else "live"
     t_start = time.perf_counter()
 
+    # live 模式下没给地址关键词就默认用「南京」（项目方所在城市），
+    # 真实 MCP 的 query-nearby-stores 需要 keyword + city 才能按位置搜门店
+    if not mock and not address:
+        address = "南京"
+
     # --- 1. 首批并行：时间 / 门店 / 营养表（三者互不依赖）---
     # 真实网络下单次 RTT 约 60~120ms，串行拉这三项要 ~300ms；并行只要一次往返。
     # 营养表在这里只是**预热缓存**，稍后 enrich_nutrition 会直接命中。
@@ -254,7 +300,11 @@ def run(
         _ = build_mood_prompt(text, mood.time_context)
 
     # --- 3. 门店已在首批并行取回 ---
-    store = stores[0] if stores else None
+    # 真实环境下要优先选「营业中」的门店，否则 query-meals 会报 600057「门店已关闭」
+    if stores:
+        store = next((s for s in stores if s.open_now), stores[0])
+    else:
+        store = None
     store_id = store.store_id if store else ""
 
     # --- 4+5. 第二批并行：菜单 / 可领券 / 一键领券 ---
@@ -263,11 +313,17 @@ def run(
     #   · query_store_coupons 必须在 auto_bind_coupons **之后** —— 先领满再查可用
     # 所以 menu / available_coupons / auto_bind 并行跑，最后再串行查门店可用券。
     with ThreadPoolExecutor(max_workers=3) as ex:
-        f_menu = ex.submit(
-            lambda: annotate_menu(
-                client.enrich_nutrition(client.query_meals(store_id)), missing_only=True
+        if client.mock:
+            # Mock：菜单需要本地标注层补口味向量 + 营养表补热量
+            f_menu = ex.submit(
+                lambda: annotate_menu(
+                    client.enrich_nutrition(client.query_meals(store_id)), missing_only=True
+                )
             )
-        )
+        else:
+            # Live：真实菜单(query-meals)只返回 code+tags+category，
+            # 口味/热量已在客户端内用 live_menu_item() 做启发式补全，无需再跑本地标注
+            f_menu = ex.submit(client.query_meals, store_id)
         f_avail = ex.submit(client.available_coupons)   # 展示「还能领几张」
         f_bind = ex.submit(client.auto_bind_coupons)    # 一键领满所有券
         menu_raw = f_menu.result()
@@ -275,7 +331,7 @@ def run(
         f_bind.result()
 
     menu = menu_raw
-    if verbose:
+    if client.mock and verbose:
         cov = coverage_report(menu)
         print(
             f"[anno] 有效口味向量 {cov['covered']}/{cov['total']} "
@@ -352,6 +408,10 @@ def run(
     # --- 8. 排序：优先「够用」，其次 RP 高，最后便宜 ---
     recs.sort(key=lambda r: (r.enough, r.rp, -r.deal.payable), reverse=True)
     recs = recs[:top]
+
+    # live 模式下用 query-meal-detail 给入选商品补全真实名称（tags 只是标签，不是商品名）
+    if not mock and store_id:
+        _enrich_names_live(client, recs, store_id)
 
     # 方案名按**展示顺序**重命名 —— 第 1 名永远叫「硬撑流」而不是「破防流」，
     # 否则用户看到的编号和名字对不上，很出戏

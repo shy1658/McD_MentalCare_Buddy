@@ -166,6 +166,10 @@ class Coupon:
       - PERCENT    : rate(0.8 = 八折) + threshold(可选门槛)
       - ITEM       : item_codes + discount(立减金额)
       - COMBO      : item_codes(套餐编码) + discount
+
+    真实 MCP 返回的券字段与 Mock 略有差异，from_dict 已兼容两种：
+      · 门店券（query-store-coupons）：title / couponId / couponCode / products
+      · 可领券（available-coupons）  ：couponName / couponStatus / label
     """
 
     coupon_id: str
@@ -186,6 +190,13 @@ class Coupon:
     """
 
     expires_at: str = ""
+    coupon_code: str = ""
+    """
+    券的「核销码」（query-store-coupons 返回的 couponCode）。
+    与 coupon_id 不同：coupon_id 是系统内主键，couponCode 是给用户展示的券码。
+    """
+    products: list[str] = field(default_factory=list)
+    """适用商品名列表（真实券常带 products[]，便于展示「适用于 XX」"""
 
     def applies_to(self, item: MenuItem) -> bool:
         """该券是否适用于某个商品（用于 ITEM / SECOND_HALF 券）"""
@@ -197,9 +208,22 @@ class Coupon:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Coupon":
+        # 真实券的「名称」字段可能是 couponName（可领券）或 title（门店券）
+        name = (
+            d.get("couponName")
+            or d.get("title")
+            or d.get("name")
+            or "优惠券"
+        )
+        # 适用商品列表：真实券的 products[] 里是 {productCode, productName}
+        products = [
+            p.get("productName") or p.get("productCode") or str(p)
+            for p in (d.get("products") or [])
+            if isinstance(p, (dict, str))
+        ]
         return cls(
             coupon_id=str(d.get("couponId") or d.get("coupon_id") or ""),
-            name=str(d.get("name") or d.get("couponName") or "优惠券"),
+            name=str(name),
             kind=CouponKind(str(d.get("kind") or d.get("type") or "threshold")),
             threshold=float(d.get("threshold") or 0.0),
             discount=float(d.get("discount") or 0.0),
@@ -211,6 +235,8 @@ class Coupon:
                 d.get("exclusive_group") or d.get("exclusiveGroup") or ""
             ),
             expires_at=str(d.get("expires_at") or d.get("expireTime") or ""),
+            coupon_code=str(d.get("couponCode") or d.get("coupon_code") or ""),
+            products=products,
         )
 
 
@@ -227,16 +253,30 @@ class Store:
     distance_m: int = 0
     open_now: bool = True
     supports_delivery: bool = False
+    be_code: str = ""
+    """
+    业务编码（beCode）。真实 MCP 中，外送（orderType=2）场景的算价 / 下单
+    必须把 beCode 与 storeCode 配对使用；到店（orderType=1）场景不传 beCode。
+    query-nearby-stores 的响应里通常不含 beCode（需从 delivery-query-stores 取），
+    因此这里默认空串，到店流程不受影响。
+    """
+    reservation: bool = False
+    """是否支持预约（真实字段 reservation）"""
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Store":
         return cls(
-            store_id=str(d.get("storeId") or d.get("store_id") or ""),
-            name=str(d.get("name") or d.get("storeName") or ""),
+            store_id=str(
+                d.get("storeCode") or d.get("storeId") or d.get("store_id") or ""
+            ),
+            name=str(d.get("storeName") or d.get("name") or ""),
             address=str(d.get("address") or ""),
             distance_m=int(d.get("distance_m") or d.get("distance") or 0),
-            open_now=bool(d.get("open_now", True)),
+            # 真实字段 businessStatus 表示是否在营业
+            open_now=bool(d.get("open_now", d.get("businessStatus", True))),
             supports_delivery=bool(d.get("supports_delivery", False)),
+            be_code=str(d.get("beCode") or d.get("be_code") or ""),
+            reservation=bool(d.get("reservation", False)),
         )
 
 

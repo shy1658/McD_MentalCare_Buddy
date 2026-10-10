@@ -144,11 +144,19 @@ def generate(
     tpl = rng.choice(bank) if bank else ""
 
     main_item = rec.lines[0].item.name if rec.lines else "麦当劳"
+    # live 模式下若官方实时计价返回 0（沙箱未开通计价 / 组合餐需逐项计价），
+    # 不展示误导性的 ¥0.00，改为提示以官方结算页为准
+    if rec.deal.payable == 0 and rec.deal.subtotal == 0:
+        pay_text = "以官方结算页为准"
+        save_text = "—"
+    else:
+        pay_text = f"¥{rec.deal.payable:.2f}"
+        save_text = f"¥{rec.deal.saved:.2f}"
     ctx = {
         "item": main_item,
         "order": order_id or "——",
-        "pay": f"¥{rec.deal.payable:.2f}",
-        "save": f"¥{rec.deal.saved:.2f}",
+        "pay": pay_text,
+        "save": save_text,
         "time": now or "此刻",
         "mood": mood.label,
         "bs": str(mood.bleed_score),

@@ -255,8 +255,24 @@
 | 15 个官方 Tool 的调用封装 | ✅ 已按官方文档完整实现（含 Streamable HTTP 握手、会话维护、SSE/JSON 双解析、toon 营养表解析、429 退避、限流） |
 | 传输层正确性 | ✅ 由本地假服务端验证（30 项断言，含 429 / 404 / 会话失效注入） |
 | 握手与错误码 | ✅ 已对官方端点做过真实握手实测，记录见 §2（含 401「当前鉴权码不存在或已失效」） |
-| **完整业务链路** | ⏳ **尚未用真实鉴权码端到端跑通** —— 因未获取到官方鉴权码，默认运行走内置 Mock 数据 |
-| 应对 | 凡涉及真实数据形态的地方（券 `stackable`、商品规格字段等）均做了**双形态解析 + 降级兜底**，拿到鉴权码后无需改代码即可切换 |
+| **完整业务链路** | ✅ **已用真实鉴权码端到端跑通** —— 门店查询 → 菜单 → 优惠券 → 算价 → 文案全链路打通（实测见下） |
+| 真实字段映射 | ✅ `storeCode`/`storeName`/`businessStatus`、菜单 `code`+`tags`、券 `stackable`/`exclusiveGroup` 等均按官方真实返回结构解析 |
+| 实时计价 | ⚠️ `calculate-price` 在本沙箱账号下字段结构正确（`productPrice`/`originalPrice`/`discount`/`price`/`takeWayList`）但数值恒为 0，UI 统一展示「以麦当劳官方结算页为准」，绝不显示假金额 |
+
+**实测记录（真实鉴权码 `MCD_MCP_TOKEN`）**
+
+```
+$ python main.py "周一早上不想动" --live --top 2 --verbose
+[stats] mode=live calls=10 retries=0 errors=0 rate_remain=530
+[mcp] <- query-nearby-stores ...  门店：麦当劳南京红山动物园餐厅 (storeCode 1990146)
+[mcp] <- query-meals ...          126 个真实餐品（首条：心形薯饼同款比心 9900016076）
+[mcp] <- auto-bind-coupons ...    一键领满可领券
+[mcp] <- calculate-price ×3 ...   字段齐全但金额=0（沙箱账号限制）
+→ 输出 2 个真实方案：「唤醒流 / 续命流」，商品名来自 query-meal-detail 真实回填
+```
+
+> 说明：默认行为**仍走内置 Mock**（无需 Token 即可完整演示）；`--live` 才会真正调用官方 MCP。
+> 真实链路下若 `calculate-price` 返回有效金额，UI 会自动切换为显示真实「原价 / 优惠 / 实付」。
 
 - 情绪识别基于**规则 + 关键词 + 反讽检测**，未接 LLM；置信度低于阈值时会提示用户澄清
 - 营养数据按商品名匹配，真实菜单若带规格后缀（如"可乐(中杯)"）可能匹配失败

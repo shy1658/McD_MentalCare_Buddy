@@ -61,6 +61,7 @@ from typing import Any, Callable, Iterable
 from .models import (
     Coupon,
     DineMode,
+    FlavorVector,
     MenuItem,
     OrderResult,
     PriceResult,
@@ -119,6 +120,76 @@ REQUIRED_TOOLS: tuple[str, ...] = (
 
 CLI_VERSION = _PKG_VERSION
 USER_AGENT = f"McD_MentalCare_Buddy/{CLI_VERSION} (+https://github.com/your-name/McD_MentalCare_Buddy)"
+
+
+# ---------------------------------------------------------------------------
+# 真实 MCP 数据适配（live mode）
+# ---------------------------------------------------------------------------
+# 真实 query-meals 只返回 `code + tags + category`（无 name / price / flavor），
+# 而推荐引擎依赖 MenuItem 的 flavor / kcal / name。这里用「分类 + 标签」做启发式补全，
+# 让引擎在 live 下也能产出有区分度的推荐。这是可解释的启发式，不是伪造价格。
+
+def _live_infer_flavor(category: str, tags: list[str]) -> "FlavorVector":
+    """由分类名 + 标签推断四维口味向量（0~1）"""
+    blob = f"{category} {' '.join(tags)}".lower()
+    salty, chewy, sweet, caffeine = 0.5, 0.3, 0.2, 0.1
+    if any(k in blob for k in ("咖啡", "美式", "拿铁", "可乐", "红茶", "绿茶", "冰", "tea", "caf")):
+        caffeine = 0.9
+    if any(k in blob for k in ("甜", "巧克力", "麦旋风", "派", "糖", "蓝莓", "草莓", "圣代", "蜂蜜", "芝士")):
+        sweet = 0.8
+    if any(k in blob for k in ("脆", "酥", "嚼", "鸡", "堡", "薯", "辣", "翅", "卷", "虾", "猪", "牛")):
+        chewy = 0.85
+    if any(k in blob for k in ("咸", "肉", "培根", "芝士", "堡", "牛", "猪")):
+        salty = 0.85
+    return FlavorVector(salty=salty, chewy=chewy, sweet=sweet, caffeine=caffeine)
+
+
+def _live_infer_kcal(category: str) -> int:
+    """由分类名估算单品热量（kcal），仅用于 live 模式下的热量偏好匹配"""
+    c = category or ""
+    if "饮" in c or "咖啡" in c:
+        return 180
+    if "甜" in c or "麦旋风" in c or "派" in c or "圣代" in c:
+        return 350
+    if "小食" in c or "拼盘" in c:
+        return 420
+    if "汉堡" in c or "卷" in c or "堡" in c:
+        return 680
+    if "单人餐" in c or "套餐" in c or "餐" in c:
+        return 650
+    return 500
+
+
+def live_menu_item(code: str, category: str, tags: list[str]) -> "MenuItem":
+    """把真实菜单里的一项（code + category + tags）补成算法可用的 MenuItem"""
+    name = " ｜ ".join(tags[:2]) if tags else (category or "套餐")
+    return MenuItem(
+        code=str(code),
+        name=name,
+        category=category or "其他",
+        price=0.0,                 # 组合餐需带 choices 才有价，live 下以 calculate-price 为准
+        tags=list(tags or []),
+        kcal=_live_infer_kcal(category),
+        available=True,
+        flavor=_live_infer_flavor(category, tags or []),
+    )
+
+
+def dine_to_codes(dine_mode: "DineMode") -> tuple[int, int]:
+    """
+    把就餐方式翻译成真实 MCP 的 orderType / beType。
+
+    beType : 1 到店自提 ｜ 2 麦乐送到家 ｜ 5 得来速(DT) ｜ 6 企业团餐
+    orderType: 1 到店(含自取+DT) ｜ 2 外送(含麦乐送+团餐)
+    注意：到店(orderType=1)时**禁止**传 beCode，外送(orderType=2)才需要 beCode。
+    """
+    mapping = {
+        DineMode.PICKUP: (1, 1),
+        DineMode.DRIVE_THRU: (1, 5),
+        DineMode.DELIVERY: (2, 2),
+        DineMode.DINE_IN: (1, 1),
+    }
+    return mapping.get(dine_mode, (1, 1))
 
 
 # ---------------------------------------------------------------------------
@@ -281,6 +352,8 @@ class McDonaldsMCPClient:
         self._negotiated_version: str = ""           # 握手后服务端确认的协议版本
         self._rpc_id = 0                             # JSON-RPC 自增请求号
         self._limiter = _SlidingWindowLimiter(rate_limit)
+        self._last_calc: dict[str, Any] = {}         # 最近一次 calculate-price 的返回（含 takeWayList）
+        self._current_be_code: str = ""              # 外送场景的 beCode（来自 delivery-query-stores）
 
         # 埋点：答辩演示时可以直接打出「本次调用了多少次接口」
         self.stats: dict[str, Any] = {
@@ -722,8 +795,10 @@ class McDonaldsMCPClient:
         if self.mock:
             return _mock()
         # ⚠️ 绝不能缓存：这是整条链路的时间源，缓存 = 时间静止
-        raw = self._real_or_mock("now-time-info", None, _mock)
-        return raw if isinstance(raw, dict) else {"datetime": str(raw)}
+        def _parse(raw: Any) -> dict[str, Any]:
+            return raw if isinstance(raw, dict) else {"datetime": str(raw)}
+
+        return self._safe_real("now-time-info", None, _mock, _parse)
 
     def campaign_calendar(self) -> dict[str, Any]:
         """
@@ -739,7 +814,7 @@ class McDonaldsMCPClient:
         return self._cached(
             "campaign",
             TTL_CAMPAIGN,
-            lambda: self._real_or_mock("campaign-calendar", None, _mock),
+            lambda: self._safe_real("campaign-calendar", None, _mock, lambda raw: raw if isinstance(raw, dict) else {}),
         )
 
     def query_my_account(self) -> dict[str, Any]:
@@ -753,59 +828,65 @@ class McDonaldsMCPClient:
 
         if self.mock:
             return _mock()
-        raw = self._real_or_mock("query-my-account", None, _mock)
-        if not isinstance(raw, dict):
-            return _mock()
-        # 官方字段名可能与本地不一致（如 points / availablePoints），这里做一次归一
-        return {
-            "points": raw.get("points") or raw.get("availablePoints") or 0,
-            "available": raw.get("available") or raw.get("availablePoints") or 0,
-            "expiring_soon": raw.get("expiring_soon") or raw.get("expiringPoints") or 0,
-            "frozen": raw.get("frozen") or raw.get("frozenPoints") or 0,
-            "raw": raw,
-        }
+        def _parse(raw: Any) -> dict[str, Any]:
+            if not isinstance(raw, dict):
+                return _mock()
+            return {
+                "points": raw.get("points") or raw.get("availablePoints") or 0,
+                "available": raw.get("available") or raw.get("availablePoints") or 0,
+                "expiring_soon": raw.get("expiring_soon") or raw.get("expiringPoints") or 0,
+                "frozen": raw.get("frozen") or raw.get("frozenPoints") or 0,
+                "raw": raw,
+            }
+        return self._safe_real("query-my-account", None, _mock, _parse)
 
     # --- 门店 ---------------------------------------------------------
 
-    def query_nearby_stores(self, address: str = "") -> list[Store]:
+    def query_nearby_stores(self, address: str = "", city: str = "") -> list[Store]:
         """
         query-nearby-stores：查询附近可用门店（到店取餐场景）。
 
-        TODO(real-mcp): 官方入参是自然语言地址，返回门店列表。
-        拿到 storeId 后才能调 query_meals —— 这是整条链路的第一个依赖点。
+        真实入参（已按官方 inputSchema 对齐）：
+            beType      : 1=到店自提，5=得来速（必传）
+            searchType  : 2=按位置搜索，1=收藏餐厅（必传）
+            keyword     : 位置关键词（如「科技园」「南京」）
+            city        : 城市名
+        返回门店列表，门店唯一编号是 `storeCode`（非 storeId），部分场景还需 `beCode` 配对。
         """
         def _mock() -> list[Store]:
             return [Store.from_dict(d) for d in self._mock_json("stores")]
 
         if self.mock:
             return _mock()
-        raw = self._cached(
-            f"stores:{address}",
+        return self._cached(
+            f"stores:{address}:{city}",
             TTL_STORE,
-            lambda: self._real_or_mock(
-                "query-nearby-stores", {"address": address}, _mock
+            lambda: self._safe_real(
+                "query-nearby-stores",
+                {"beType": 1, "searchType": 2, "keyword": address or "麦当劳", "city": city or address or "南京"},
+                _mock,
+                lambda raw: [Store.from_dict(s) for s in self._as_list(raw)],
             ),
         )
-        # _mock() 返回的是 Store 对象列表，真实返回是 dict 列表，这里统一处理
-        if raw and all(isinstance(x, Store) for x in raw):
-            return list(raw)
-        return [Store.from_dict(d) for d in self._as_list(raw)]
 
     def query_delivery_stores(self, address_id: str = "") -> list[Store]:
         """
         delivery-query-stores：外送场景查询可配送门店。
 
-        TODO(real-mcp): 需先调 delivery-query-addresses 拿 addressId。
+        真实入参需 beType=2、searchType、keyword/city（与 query-nearby-stores 类似），
+        返回结果里会带上外送所需的 beCode。
         """
         def _mock() -> list[Store]:
             return [s for s in self.query_nearby_stores() if s.supports_delivery]
 
         if self.mock:
             return _mock()
-        raw = self._real_or_mock("delivery-query-stores", {"addressId": address_id}, _mock)
-        if raw and all(isinstance(x, Store) for x in raw):
-            return list(raw)
-        return [Store.from_dict(d) for d in self._as_list(raw)]
+        return self._safe_real(
+            "delivery-query-stores",
+            {"beType": 2, "searchType": 2, "keyword": "麦当劳", "addressId": address_id},
+            _mock,
+            lambda raw: [Store.from_dict(s) for s in self._as_list(raw)],
+        )
 
     # --- 菜单 ---------------------------------------------------------
 
@@ -813,8 +894,10 @@ class McDonaldsMCPClient:
         """
         query-meals：查询当前门店可售卖的餐品列表。
 
-        返回含「分类、餐品编码、标签」，其中标签用于过滤售罄与时段限制。
-        热量数据不在这里，需另调 list_nutrition_foods() 补齐（见 enrich_nutrition）。
+        真实入参（官方 inputSchema）：storeCode（必传）+ orderType + beType。
+        到店取餐：orderType=1, beType=1；**此时不要传 beCode**。
+        真实返回结构：`data.categories[].meals[]`，每项只有 `code` + `tags` + 所属分类，
+        没有 name/price —— 这里用 live_menu_item() 做口味/热量启发式补全，供推荐引擎使用。
         """
         if refresh:
             self._cache.pop(f"menu:{store_id}", None)
@@ -824,36 +907,86 @@ class McDonaldsMCPClient:
 
         if self.mock:
             return _mock()
-        raw = self._cached(
+
+        def _parse(raw: Any) -> list[MenuItem]:
+            # raw 已经是 _require_ok 后的 data（dict 或 list）。
+            # 同时兼容三类返回形态：
+            #   (A) 真实 API：{"categories":[{"categoryName":..., "meals":[{"code","tags"}]}]}
+            #   (B) 扁平列表（自带 name/price，测试/拟真服务端用）：
+            #       [{"code"/"mealCode","name"/"mealName","category"/"categoryName","price"/"salePrice"}]
+            #   (C) 外层套了一个数组键的列表
+            cats = raw.get("categories") if isinstance(raw, dict) else None
+            if cats:  # 真实 API 形态：只有 code + tags，口味/热量靠 live_menu_item 启发式补全
+                items: list[MenuItem] = []
+                for cat in cats:
+                    cname = cat.get("name") or cat.get("categoryName") or "其他"
+                    for m in cat.get("meals") or []:
+                        if not isinstance(m, dict):
+                            continue
+                        code = m.get("code") or ""
+                        if code:
+                            items.append(live_menu_item(code, cname, m.get("tags") or []))
+                return items
+
+            # 扁平形态：兼容 code/mealCode、name/mealName、category/categoryName、price/salePrice
+            items = []
+            for m in self._as_list(raw):
+                if not isinstance(m, dict):
+                    continue
+                code = m.get("code") or m.get("mealCode") or m.get("meal_code") or ""
+                if not code:
+                    continue
+                name = m.get("name") or m.get("mealName") or ""
+                price = float(m.get("price") or m.get("salePrice") or 0.0)
+                cname = m.get("category") or m.get("categoryName") or "其他"
+                if name or price:
+                    items.append(MenuItem.from_dict({
+                        "code": code, "name": name, "category": cname,
+                        "price": price, "tags": list(m.get("tags") or []),
+                        "kcal": int(m.get("kcal") or 0),
+                    }))
+                else:
+                    # 仅 code + tags（理论上只在嵌套形态出现，这里兜底）
+                    items.append(live_menu_item(code, cname, m.get("tags") or []))
+            if items:
+                # 扁平形态往往缺口味向量，补一层本地标注，保证 RP 打分不退化
+                try:
+                    from .annotation import annotate_menu
+
+                    items = annotate_menu(items, missing_only=True)
+                except Exception:  # noqa: BLE001
+                    pass
+            return items
+
+        return self._cached(
             f"menu:{store_id}",
             TTL_MENU,
-            lambda: self._real_or_mock("query-meals", {"storeId": store_id}, _mock),
+            lambda: self._safe_real(
+                "query-meals",
+                {"storeCode": store_id, "orderType": 1, "beType": 1},
+                _mock,
+                _parse,
+            ),
         )
-        if raw and all(isinstance(x, MenuItem) for x in raw):
-            return list(raw)
-        return [MenuItem.from_dict(d) for d in self._as_list(raw)]
 
-    def query_meal_detail(self, meal_code: str) -> dict[str, Any]:
+    def query_meal_detail(self, meal_code: str, store_id: str = "") -> dict[str, Any]:
         """
-        query-meal-detail：查询餐品详情（套餐组成、默认选项、可替换项）。
+        query-meal-detail：查询餐品详情（名称 / 套餐组成 rounds / 可选 choices）。
 
-        用途：对候选集前 10 名做精细打分时用，避免全量调用打满限流。
+        真实入参：storeCode + orderType + beType + code。
+        注意：详情里含 rounds/choices，但**不含价格**；价格一律以后续 calculate-price 为准。
         """
         def _mock() -> dict[str, Any]:
-            return {"code": meal_code, "components": [], "options": []}
+            return {"code": meal_code, "name": meal_code, "rounds": [], "choices": []}
 
         if self.mock:
             return _mock()
-        # 详情是静态度较高的数据，可以复用菜单的 TTL；
-        # 更重要的是：候选集通常 10 个左右，不缓存很容易打满 600 次/分钟
-        raw = self._cached(
-            f"detail:{meal_code}",
-            TTL_MENU,
-            lambda: self._real_or_mock(
-                "query-meal-detail", {"mealCode": meal_code}, _mock
-            ),
+        return self._safe_real(
+            "query-meal-detail",
+            {"storeCode": store_id, "orderType": 1, "beType": 1, "code": meal_code},
+            _mock,
+            lambda raw: raw if isinstance(raw, dict) else {"code": meal_code},
         )
-        return raw if isinstance(raw, dict) else _mock()
 
     @staticmethod
     def parse_nutrition_toon(text: str) -> dict[str, int]:
@@ -959,17 +1092,19 @@ class McDonaldsMCPClient:
         if self.mock:
             return _mock()
 
-        raw = self._cached(
+        def _parse(raw: Any) -> dict[str, int]:
+            if isinstance(raw, dict):
+                # 已经是 {名: 值}（服务端直接给了结构化数据）
+                return {str(k): int(v) for k, v in raw.items() if str(v).isdigit()}
+            if isinstance(raw, str):
+                return self.parse_nutrition_toon(raw)
+            return _mock()
+
+        return self._cached(
             "nutrition",
             TTL_NUTRITION,
-            lambda: self._real_or_mock("list-nutrition-foods", None, _mock),
+            lambda: self._safe_real("list-nutrition-foods", None, _mock, _parse),
         )
-        if isinstance(raw, dict):
-            # 已经是 {名: 值}（Mock 或服务端直接给了结构化数据）
-            return {str(k): int(v) for k, v in raw.items() if str(v).isdigit()}
-        if isinstance(raw, str):
-            return self.parse_nutrition_toon(raw)
-        return _mock()
 
     def enrich_nutrition(self, items: list[MenuItem]) -> list[MenuItem]:
         """给菜单补齐热量数据（RP 公式的 energy_fit 分量依赖它）"""
@@ -996,10 +1131,10 @@ class McDonaldsMCPClient:
 
         if self.mock:
             return _mock()
-        raw = self._real_or_mock("available-coupons", None, _mock)
-        if raw and all(isinstance(x, Coupon) for x in raw):
-            return list(raw)
-        return [Coupon.from_dict(d) for d in self._as_list(raw)]
+        return self._safe_real(
+            "available-coupons", None, _mock,
+            lambda raw: [Coupon.from_dict(d) for d in self._as_list(raw)],
+        )
 
     def auto_bind_coupons(self) -> list[str]:
         """
@@ -1019,13 +1154,39 @@ class McDonaldsMCPClient:
 
         if self.mock:
             return _mock()
-        raw = self._real_or_mock("auto-bind-coupons", None, _mock)
-        return [str(x) for x in self._as_list(raw)]
+        def _parse(raw: Any) -> list[str]:
+            # 返回可能是 {data:[...]} 或直接是字符串/列表；统一拍平成字符串 id 列表
+            if isinstance(raw, dict):
+                for k in ("data", "list", "couponIds", "couponIds"):
+                    v = raw.get(k)
+                    if isinstance(v, list):
+                        return [str(x) for x in v]
+                if "couponId" in raw or "coupon_id" in raw:
+                    return [str(raw.get("couponId") or raw.get("coupon_id"))]
+            if isinstance(raw, list):
+                return [str(x) for x in raw]
+            if isinstance(raw, str):
+                return [raw]
+            return []
+        try:
+            raw = self._call_with_retry("auto-bind-coupons", {})
+            return _parse(self._require_ok(raw))
+        except McpError as e:
+            # 499「暂无可领取的优惠券」等软错误 → 视为「现在没券可领」，返回空列表，
+            # 不应中断整条链路（仍可继续用 query-store-coupons 里已有的券）
+            msg = str(e)
+            if "499" in msg or "暂无可" in msg or "无可用" in msg or "暂无" in msg:
+                return []
+            if self.fallback_to_mock:
+                self.stats["mock_fallbacks"] += 1
+                return _mock()
+            raise
 
     def query_store_coupons(self, store_id: str) -> list[Coupon]:
         """
         query-store-coupons：查询用户在**当前门店**下可用的券。
 
+        真实入参（官方 inputSchema）：storeCode + orderType + beType（必传）。
         注意与 query_my_coupons 的区别：
           - query_my_coupons      = 我账户里所有的券（可能这家店用不了）
           - query_store_coupons   = 这家店能用的券（真正能核销的）
@@ -1040,10 +1201,12 @@ class McDonaldsMCPClient:
 
         if self.mock:
             return _mock()
-        raw = self._real_or_mock("query-store-coupons", {"storeId": store_id}, _mock)
-        if raw and all(isinstance(x, Coupon) for x in raw):
-            return list(raw)
-        return [Coupon.from_dict(d) for d in self._as_list(raw)]
+        return self._safe_real(
+            "query-store-coupons",
+            {"storeCode": store_id, "orderType": 1, "beType": 1},
+            _mock,
+            lambda raw: [Coupon.from_dict(d) for d in self._as_list(raw)],
+        )
 
     def query_my_coupons(self) -> list[Coupon]:
         """query-my-coupons：我的优惠券（全账户）"""
@@ -1052,10 +1215,10 @@ class McDonaldsMCPClient:
 
         if self.mock:
             return _mock()
-        raw = self._real_or_mock("query-my-coupons", None, _mock)
-        if raw and all(isinstance(x, Coupon) for x in raw):
-            return list(raw)
-        return [Coupon.from_dict(d) for d in self._as_list(raw)]
+        return self._safe_real(
+            "query-my-coupons", {}, _mock,
+            lambda raw: [Coupon.from_dict(d) for d in self._as_list(raw)],
+        )
 
     # --- 算价与下单 ---------------------------------------------------
 
@@ -1083,14 +1246,20 @@ class McDonaldsMCPClient:
                 TODO(real-mcp): 接入真实接口后，应把本方法返回的 payable 与
                 本地估算做一次一致性校验，差异 > 0.01 元时中止下单并提示用户。
         """
+        order_type, be_type = dine_to_codes(dine_mode)
         payload = {
-            "storeId": store_id,
-            "dineMode": dine_mode.value,
+            "storeCode": store_id,
+            "orderType": order_type,
+            "beType": be_type,
             "items": [
-                {"mealCode": ln["code"], "quantity": ln["qty"]} for ln in lines
+                {"code": ln["code"], "quantity": ln["qty"]} for ln in lines
             ],
             "couponIds": coupon_ids or [],
+            "needTableware": False,
         }
+        # 外送(orderType=2)必须把 beCode 与 storeCode 配对；到店(orderType=1)不要传
+        if order_type == 2 and self._current_be_code:
+            payload["beCode"] = self._current_be_code
 
         if self.mock:
             subtotal = sum(float(ln.get("price", 0)) * int(ln.get("qty", 1)) for ln in lines)
@@ -1104,13 +1273,19 @@ class McDonaldsMCPClient:
                 raw={"mock": True, "payload": payload},
             )
 
+        # 真实链路：绝不自己算钱，金额一律以服务端为准
         raw = self._call_with_retry("calculate-price", payload)
+        data = self._require_ok(raw)
+        self._last_calc = data if isinstance(data, dict) else {}
+        d = self._last_calc
+        # 兼容两种字段命名：真实 API 用 productPrice/originalPrice/discount/price，
+        # 拟真/测试服务端用 totalAmount/discountAmount/payableAmount
         return PriceResult(
-            subtotal=float(raw.get("totalAmount") or raw.get("subtotal") or 0.0),
-            discount=float(raw.get("discountAmount") or raw.get("discount") or 0.0),
-            delivery_fee=float(raw.get("deliveryFee") or 0.0),
-            payable=float(raw.get("payableAmount") or raw.get("payable") or 0.0),
-            raw=raw,
+            subtotal=float(d.get("productPrice") or d.get("originalPrice") or d.get("totalAmount") or 0.0),
+            discount=float(d.get("discount") or d.get("discountAmount") or 0.0),
+            delivery_fee=float(d.get("deliveryFee") or 0.0),
+            payable=float(d.get("price") or d.get("payable") or d.get("payableAmount") or 0.0),
+            raw=d,
         )
 
     def create_order(
@@ -1133,12 +1308,23 @@ class McDonaldsMCPClient:
                 "由用户显式确认后再调用（CLI 中对应去掉 --dry-run）。"
             )
 
+        order_type, be_type = dine_to_codes(dine_mode)
         payload = {
-            "storeId": store_id,
-            "dineMode": dine_mode.value,
-            "items": [{"mealCode": ln["code"], "quantity": ln["qty"]} for ln in lines],
+            "storeCode": store_id,
+            "orderType": order_type,
+            "beType": be_type,
+            "items": [{"code": ln["code"], "quantity": ln["qty"]} for ln in lines],
             "couponIds": coupon_ids or [],
+            "needTableware": False,
         }
+        # 外送(orderType=2)必传 beCode 与 addressId；到店(orderType=1)/得来速必传 takeWayCode
+        if order_type == 2:
+            if self._current_be_code:
+                payload["beCode"] = self._current_be_code
+        else:
+            tw = self._pick_take_way()
+            if tw:
+                payload["takeWayCode"] = tw
 
         if self.mock:
             return OrderResult(
@@ -1149,13 +1335,14 @@ class McDonaldsMCPClient:
                 raw={"mock": True, "payload": payload},
             )
 
-        raw = self._call_with_retry("create-order", payload)
+        # 真实下单：绝不降级到 Mock（这是安全红线）
+        data = self._require_ok(self._call_with_retry("create-order", payload))
         return OrderResult(
-            order_id=str(raw.get("orderId") or raw.get("orderNo") or ""),
-            pay_url=str(raw.get("payUrl") or ""),
-            pickup_code=str(raw.get("pickupCode") or raw.get("qrCode") or ""),
-            status=str(raw.get("status") or ""),
-            raw=raw,
+            order_id=str(data.get("orderId") or data.get("orderNo") or ""),
+            pay_url=str(data.get("payUrl") or ""),
+            pickup_code=str(data.get("pickupCode") or data.get("qrCode") or ""),
+            status=str(data.get("status") or ""),
+            raw=data,
         )
 
     def query_order(self, order_id: str) -> OrderResult:
@@ -1346,6 +1533,66 @@ class McDonaldsMCPClient:
     # ------------------------------------------------------------------
     # 工具
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # 真实响应信封处理
+    # ------------------------------------------------------------------
+
+    def _require_ok(self, raw: Any) -> Any:
+        """
+        校验真实 MCP 的业务信封 `{success, code, message, data}`。
+
+        `success:false` 一律当业务错误抛出（如门店打烊 code 600057、
+        缺少参数 code 400）。只有成功才返回 `data`（缺 data 时返回原 dict）。
+        非 dict（如 nutrition 的 toon 文本）原样返回。
+        """
+        if isinstance(raw, dict):
+            if raw.get("success") is False:
+                msg = raw.get("message") or "业务错误"
+                code = raw.get("code", "")
+                raise McpError(f"[{code}] {msg}")
+            return raw.get("data", raw)
+        return raw
+
+    def _safe_real(
+        self,
+        tool: str,
+        args: dict[str, Any] | None,
+        mock_fn: Callable[[], Any],
+        parse_fn: Callable[[Any], Any],
+    ) -> Any:
+        """
+        真实优先、失败降级（仅只读接口）。
+
+        与 `_real_or_mock` 的区别：这里先过 `_require_ok` 再交给 parse_fn，
+        业务错误（success:false）也会被正确识别。自动降级仅对 fallback_to_mock 生效。
+        """
+        if self.mock:
+            return mock_fn()
+        try:
+            raw = self._call_with_retry(tool, args)
+            return parse_fn(self._require_ok(raw))
+        except McpError:
+            if self.fallback_to_mock:
+                self.stats["mock_fallbacks"] += 1
+                return mock_fn()
+            raise
+
+    def _pick_take_way(self) -> str:
+        """
+        从最近一次 calculate-price 的 takeWayList 里挑一个取餐方式编码。
+
+        优先「外带 / 到店自提」(take-in-store)，没有再退化为列表第一个。
+        到店(orderType=1)场景 create-order 必传 takeWayCode，否则服务端报错。
+        """
+        lst = (self._last_calc or {}).get("takeWayList") or []
+        if not lst:
+            return ""
+        for opt in lst:
+            code = opt.get("code") or ""
+            if "take-in-store" in code or "外带" in (opt.get("title") or ""):
+                return code
+        return str(lst[0].get("code") or "")
 
     @staticmethod
     def _as_list(raw: Any) -> list[Any]:

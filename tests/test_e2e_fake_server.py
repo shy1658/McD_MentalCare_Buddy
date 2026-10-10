@@ -158,7 +158,8 @@ class _Handler(BaseHTTPRequestHandler):
             params = req.get("params") or {}
             args = params.get("arguments") or {}
             price_map = {i["mealCode"]: i["salePrice"] for i in RAW_MENU}
-            subtotal = sum(price_map.get(ln["mealCode"], 0) * ln["quantity"]
+            # 真实 API 的 calculate-price 入参 items 用 `code` 字段（与 query-meals 的 mealCode 对应）
+            subtotal = sum(price_map.get(ln.get("code") or ln.get("mealCode"), 0) * ln["quantity"]
                            for ln in args.get("items", []))
             # 极简的可叠加满减模拟：按门槛从高到低命中一张
             discount = 0.0

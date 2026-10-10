@@ -68,12 +68,16 @@ def render_mood_card(rec: Recommendation) -> list[str]:
     return lines
 
 
-def render_plan(rec: Recommendation, idx: int) -> list[str]:
+def render_plan(rec: Recommendation, idx: int, client_mode: str = "mock") -> list[str]:
     """单个方案卡片"""
     d = rec.deal
     mark = "✅" if rec.enough else "⚠️"
     if rec.over_budget:
         mark = "💸"
+
+    # live 模式下若官方实时计价返回 0（如沙箱未开通计价 / 组合餐需逐项计价），
+    # 不应展示误导性的 ¥0.00，改为提示以官方结算页为准
+    live_no_price = client_mode == "live" and d.subtotal == 0 and d.payable == 0
 
     out = [
         f"### {idx}. 【{rec.plan_name}】{mark}",
@@ -82,12 +86,15 @@ def render_plan(rec: Recommendation, idx: int) -> list[str]:
         "",
         f"| 项 | 值 |",
         f"|---|---|",
-        f"| 原价 | ~~{_money(d.subtotal)}~~ |",
-        f"| 优惠 | −{_money(d.discount)}（{_coupon_names(d.applied)}）|",
     ]
-    if d.delivery_fee:
-        out.append(f"| 配送费 | {_money(d.delivery_fee)} |")
-    out.append(f"| **实付** | **{_money(d.payable)}**（省 {_money(d.saved)}，折扣率 {d.discount_rate:.0%}）|")
+    if live_no_price:
+        out.append("| 价格 | 以麦当劳官方结算页为准（实时计价接口本次返回 0）|")
+    else:
+        out.append(f"| 原价 | ~~{_money(d.subtotal)}~~ |")
+        out.append(f"| 优惠 | −{_money(d.discount)}（{_coupon_names(d.applied)}）|")
+        if d.delivery_fee:
+            out.append(f"| 配送费 | {_money(d.delivery_fee)} |")
+        out.append(f"| **实付** | **{_money(d.payable)}**（省 {_money(d.saved)}，折扣率 {d.discount_rate:.0%}）|")
     out.append("")
 
     # 续命值
@@ -201,7 +208,7 @@ def render(
     blocks.append("## 🍟 为你匹配到这些方案")
     blocks.append("")
     for i, r in enumerate(recs[:3], start=1):
-        blocks += render_plan(r, i)
+        blocks += render_plan(r, i, client_mode=client_mode)
 
     blocks += render_copy(head)
     blocks += render_order(head, order)
