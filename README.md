@@ -20,30 +20,123 @@
 
 ---
 
-## 🤖 这是一个 Skill
+## 🎯 目标用户
 
-**[`skill/SKILL.md`](skill/SKILL.md) 是本项目的大赛核心交付物** —— 情绪矩阵、MCP 调用顺序铁律、
-安全红线、降级策略都在里面。想直接看"它作为 Skill 怎么用"，从那里开始。
+**一线打工人 · 18–35 岁 · 每天至少一次"不知道吃什么"**
 
-## ⚡ 30 秒上手（无需 Token、无需网络）
+| 典型画像 | 真实场景 | 他真正需要什么 |
+|---|---|---|
+| **被加班掏空的程序员 / 运营** | 晚上 10 点还在改第 11 版需求 | 提神 + 快 + 别再让我做选择 |
+| **对外沟通耗尽的打工人** | 被甲方磨了一整天，一句话都不想说 | 一个能咬的东西 + 一句替我骂出来的话 |
+| **发薪日的短暂富豪** | 工资到账 0.3 秒后想犒劳自己 | 有人告诉我"你配"，顺便别让我多花钱 |
+| **月末吃土的预算党** | 余额不多但想吃顿像样的 | 帮我凑到最省，别让我自己算 |
+| **减肥第 3 天破防的人** | 忍了两天半，此刻只想放纵 | 别评判我，给个不太罪恶的选项 |
+
+> 共同点：**他们不缺一个菜单，缺一个"懂我今天有多惨"的搭子。**
+
+---
+
+## 📋 参赛必交文件
+
+| 文件 | 说明 |
+|---|---|
+| [`README.md`](./README.md) | 项目介绍 / 安装方法 / 使用示例 / 目标用户（本文件） |
+| [`CONTEST_DECLARATION.md`](./CONTEST_DECLARATION.md) | 参赛声明（官方指定文件，内容未改动） |
+| [`MCP_INTEGRATION.md`](./MCP_INTEGRATION.md) | 实际使用的 MCP Server / Tool / 调用流程 / 业务价值 |
+| [`mcp-config.example.json`](./mcp-config.example.json) | 脱敏 MCP 配置示例（仅环境变量占位符） |
+| [`workbuddy.md`](./workbuddy.md) | WorkBuddy 开发对话上下文（参与专项奖励） |
+| [`skill/SKILL.md`](skill/SKILL.md) | ⭐ Skill 主入口 —— 情绪矩阵、调用铁律、安全红线 |
+| 源代码 | `main.py` + `mcd_mood_buddy/` + `tests/`（149 项断言） |
+| [`NOTICE.md`](./NOTICE.md) | 补充说明：数据来源 / 商标 / AI 使用披露 |
+
+---
+
+## 📦 安装方法
+
+**零第三方依赖** —— 只需要 Python 3.10+，不需要 `pip install` 任何东西。
 
 ```bash
 git clone https://github.com/<your-github-username>/McD_MentalCare_Buddy.git
 cd McD_MentalCare_Buddy
 
-python main.py "还有40个bug要改 我想死"
-# 等价于 Skill 入口：python skill/scripts/main.py "还有40个bug要改 我想死"
+python --version          # 确认 ≥ 3.10
+python main.py --doctor   # 环境自检（离线模式，无需 Token）
 ```
 
-就这么简单。**零第三方依赖**，默认走内置 Mock 数据，完整跑通从情绪识别到发疯文学的全链路。
+```text
+💡 依赖说明
+   传输层（Streamable HTTP 握手、SSE 解析、指数退避、滑动窗口限流）
+   全部基于 Python 标准库 urllib 实现 —— 所以 requirements.txt 是空的，
+   这不是遗漏，是刻意选择：评审 clone 下来就能跑，不会被环境问题卡住。
+```
+
+**可选：接入真实麦当劳 MCP**（不配也能完整演示，走内置离线数据）
+
+```bash
+# 方式一：环境变量
+export MCD_MCP_TOKEN="你的Token"          # Windows: set MCD_MCP_TOKEN=你的Token
+
+# 方式二：本地文件（权限收紧）
+mkdir -p ~/.config/mcd && umask 077 && printf '%s' '你的Token' > ~/.config/mcd/mcp_token
+
+python main.py "加班" --live --doctor     # 体检真实链路
+```
+
+> Token 申请：<https://open.mcd.cn/mcp> → 手机号登录 → 控制台 → 激活
+> 🔒 真实 Token 已被 `.gitignore` 强制忽略，**绝不会进入仓库**。
+
+---
+
+## 💻 使用示例
+
+**基础用法**（默认离线模式，无需 Token、无需网络）
+
+```bash
+python main.py "还有40个bug要改 我想死"      # 加班到崩溃
+python main.py "甲方要五彩斑斓的黑，我笑了"   # 反讽识别：字面开心 → 判定爆表
+python main.py "发工资了！！！" --budget 60 --style flex
+python main.py "想摸鱼"                       # 反向智能：不推大堡，怕你吃困
+# 等价 Skill 入口：python skill/scripts/main.py "还有40个bug要改 我想死"
+```
+
+**进阶用法**
 
 ```bash
 python main.py --list-moods                              # 看看支持哪些精神状态
-python main.py "发工资了！！！" --budget 60 --style flex   # 限预算 + 凡尔赛文体
 python main.py "想摸鱼" --json                            # 输出 JSON 便于调试
 python main.py "被气死了" --confirm                       # 真正下单（默认不会）
 python main.py --doctor --live                            # 体检真实 MCP 链路
 python main.py "加班" --live --auto-mock --verbose        # 接真实 MCP，断网自动降级
+python tests/run_all.py                                   # 149 项断言，5 个套件
+```
+
+**实际输出长什么样**
+
+```text
+$ python main.py "还有40个bug要改 我想死"
+
+🩺 情绪诊断
+> 加班到崩溃   失血值 95  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░
+
+### 1.【硬撑流】 1+1随心配 + 麦辣鸡翅(10块) + 冰拿铁
+| 原价   | ~~¥78.90~~                        |
+| 优惠   | −¥17.00（满55减12 + 单品券）        |
+| 实付   | ¥61.90（省 ¥17.00，折扣率 22%）     |
+
+续命值 RP 100 —— 够用，能撑住
+<sub>口味 37/40 ｜ 热量 20/20 ｜ 功能 16/20 ｜ 取向 20/20 ｜ 暴击 11/20</sub>
+
+🎯 凑单提示：加购「麦辣鸡翅(2块)」（¥13.00）后触发满减，实付反而少 ¥2.00
+```
+
+```text
+$ python main.py "我不想活了"
+
+🫂 先停一下
+我听到你说的话了，而且我认真对待。
+🆘 全国 24 小时心理援助热线：12356
+...
+> 本次未调用任何麦当劳 MCP 接口，未生成任何点餐推荐。
 ```
 
 > 🛡️ **默认 `--dry-run`，永不自动下单。** 只有显式 `--confirm` 才会调用 `create-order`。
@@ -232,7 +325,7 @@ query-my-account       campaign-calendar        order-list
 > 🎤 答辩话术：**"我们假设 MCP 会挂 —— 但挂的方式不止一种。"**  
 > 可以当场断网演示，也可以当场演示「会话过期自动重连」。
 
-详细接入说明见 [`docs/02-mcp-integration.md`](docs/02-mcp-integration.md)。
+详细接入说明见 [`MCP_INTEGRATION.md`](./MCP_INTEGRATION.md)。
 
 ---
 
@@ -240,6 +333,11 @@ query-my-account       campaign-calendar        order-list
 
 ```
 McD_MentalCare_Buddy/
+├── README.md                    # 📋 必交：项目介绍 / 安装方法 / 使用示例 / 目标用户
+├── CONTEST_DECLARATION.md       # 📋 必交：参赛声明（官方指定，内容未改动）
+├── MCP_INTEGRATION.md           # 📋 必交：MCP Server / Tool / 调用流程 / 业务价值
+├── mcp-config.example.json      # 📋 必交：脱敏配置（仅环境变量占位符）
+├── workbuddy.md                 # 📋 必交（专项奖励）：WorkBuddy 对话上下文
 ├── skill/                       # 🤖 WorkBuddy Skill 本体（大赛核心交付物，放最前）
 │   ├── SKILL.md                 # ⭐ Skill 主入口 —— 评审第一个看的
 │   ├── references/
@@ -266,7 +364,6 @@ McD_MentalCare_Buddy/
 │   └── mappings/flavor_map.json # 口味映射规则（调参不用改代码）
 ├── docs/
 │   ├── PRD.md                   # 完整需求文档
-│   ├── 02-mcp-integration.md    # MCP 接入说明（大赛硬性要求）
 │   └── 03-github-release.md     # 发布与提交指南
 ├── tests/
 │   ├── run_all.py               # ⭐ 一键跑全部套件（共 149 项断言）
@@ -275,7 +372,7 @@ McD_MentalCare_Buddy/
 │   ├── test_smoke.py            # 业务逻辑冒烟（27 项）
 │   ├── test_live_transport.py   # MCP 传输层协议（30 项，含本地假服务端）
 │   └── test_e2e_fake_server.py  # 拟真服务端上的完整点餐链路（13 项）
-├── NOTICE.md                    # 参赛声明与商标声明
+├── NOTICE.md                    # 补充说明：数据来源 / 商标 / AI 使用披露
 └── LICENSE                      # MIT（+ 商标例外说明）
 ```
 
@@ -331,11 +428,16 @@ grep -rn "TODO(real-mcp)" mcd_mood_buddy/
 
 ## ⚖️ 参赛声明
 
-- 本项目为 **2026 麦当劳程序员创意开发大赛（M-CODE）参赛作品**，**非麦当劳官方产品**。
+- 本项目为 **2026 麦当劳程序员创意开发大赛参赛作品**，**非麦当劳官方产品**。
 - 菜单、价格、优惠券、订单数据均通过麦当劳官方 MCP 实时获取；Mock 数据仅用于离线演示并已显著标注。
 - **不构成对麦当劳及其关联方商标的任何授权**。
 - 情绪相关内容为**娱乐化表达**，不构成心理诊疗或医疗建议。
-- 详见 [`NOTICE.md`](./NOTICE.md)。
+  ⚠️ 若你正经历严重心理困扰，请拨打**全国 24 小时心理援助热线 `12356`**。
+
+| 文件 | 内容 |
+|---|---|
+| [`CONTEST_DECLARATION.md`](./CONTEST_DECLARATION.md) | ⚖️ **正式参赛声明**（官方指定文件，内容未改动） |
+| [`NOTICE.md`](./NOTICE.md) | 补充说明：数据来源 / 商标 / 第三方依赖 / AI 使用披露 |
 
 ---
 

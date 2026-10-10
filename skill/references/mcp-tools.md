@@ -1,7 +1,7 @@
 # 麦当劳官方 MCP 工具速查
 
 > 对齐官方仓库 `M-China/mcd-mcp-server` **v1.0.9**（共 33 个 Tool，本项目用其中 15 个）。
-> 详细接入说明见仓库根目录 `docs/02-mcp-integration.md`。
+> 详细接入说明见仓库根目录 `MCP_INTEGRATION.md`。
 
 ## 1. 连接信息
 

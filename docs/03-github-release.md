@@ -14,9 +14,24 @@
 | 2 | `.env` 被忽略 | `git check-ignore -v .env` | 🔴 泄露凭证 |
 | 3 | Mock 数据已标注 | `data/mock/*.json` 顶部注释 + 运行时横幅 | 🟡 被误认为伪造数据 |
 | 4 | 离线可跑通 | `python main.py "累成狗"`（不设 Token） | 🟡 评委跑不起来 |
-| 5 | 冒烟测试全绿 | `python tests/test_smoke.py` | 🟡 完成度存疑 |
-| 6 | 参赛声明齐 | `NOTICE.md` + `docs/02-mcp-integration.md` | 🔴 大赛硬性要求 |
+| 5 | 测试全绿 | `python tests/run_all.py`（149 项） | 🟡 完成度存疑 |
+| 6 | **官方必交 5 文件齐** | 见下表 | 🔴 **报名直接失败** |
 | 7 | 无真实用户数据 | 检查 `.mcd_profile.json` 是否已删 | 🟡 隐私问题 |
+
+### ⚠️ 官方必交文件（文件名与内容均不可改动）
+
+以活动官方仓库 `M-China/mcd-developer-innovation-challenge` 的规则为准：
+
+| 文件 | 要求 | 本项目 |
+|---|---|---|
+| `README.md` | 项目介绍、安装方法、使用示例、目标用户 | ✅ |
+| `CONTEST_DECLARATION.md` | 参赛声明，**文件名及内容均不可改动** | ✅ 官方原文 |
+| `MCP_INTEGRATION.md` | 使用的 MCP Server、Tool、调用流程、业务价值 | ✅ |
+| `mcp-config.example.json` | 脱敏配置，**只允许环境变量占位符** | ✅ |
+| `workbuddy.md` | 参与 WorkBuddy 专项奖励时必交 | ✅ |
+
+> 另需满足：仓库为 **Public**、项目创建时间在 2025-12-25 至 2026-10-25 之间、
+> 通过官方 Issue 格式提交报名（正文 ≤ 1000 字、不含图片）。
 
 ### 一条命令做安全自检
 
@@ -104,7 +119,7 @@ gh release create v0.1.0 \
 
 ## 四、MCP 接入说明的建议
 
-大赛明确要求「MCP 接入说明」。建议**单独成文**（`docs/02-mcp-integration.md`），并在 README 用一小节链接过去。内容建议按下面 6 段组织：
+大赛明确要求「MCP 接入说明」。建议**单独成文**（`MCP_INTEGRATION.md`），并在 README 用一小节链接过去。内容建议按下面 6 段组织：
 
 ### 段落 1：接入信息表（一眼能对）
 

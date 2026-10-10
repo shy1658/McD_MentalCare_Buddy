@@ -335,7 +335,6 @@ mcd-mood-buddy/
 │
 ├── docs/                              # 📚 文档区（评委主要看这里）
 │   ├── 01-PRD.md                      # 本需求文档
-│   ├── 02-mcp-integration.md          # ⭐ MCP 接入说明（大赛硬性要求）
 │   ├── 03-mood-matrix.md              # 情绪—口味映射矩阵（核心资产）
 │   ├── 04-flow-diagram.md             # 调用流程图（Mermaid + PNG）
 │   ├── 05-user-stories.md             # 完整用户故事集
@@ -459,7 +458,7 @@ mcd-mood-buddy/
 ## 🔌 MCP 接入说明
 
 - 地址 `https://mcp.mcd.cn` ｜ Streamable HTTP ｜ Bearer Token
-- 用到 15 个官方 Tool（完整清单见 `docs/02-mcp-integration.md`）
+- 用到 15 个官方 Tool（完整清单见 `MCP_INTEGRATION.md`）
 - [流程图](docs/04-flow-diagram.md) ｜ 限流 600 次/分钟 ｜ 已实现指数退避 + 本地缓存
 
 ---
