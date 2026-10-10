@@ -269,8 +269,9 @@ McD_MentalCare_Buddy/
 │   ├── 02-mcp-integration.md    # MCP 接入说明（大赛硬性要求）
 │   └── 03-github-release.md     # 发布与提交指南
 ├── tests/
-│   ├── run_all.py               # ⭐ 一键跑全部套件（共 125 项断言）
+│   ├── run_all.py               # ⭐ 一键跑全部套件（共 149 项断言）
 │   ├── test_safety.py           # ⭐ 心理危机干预（55 项，安全底线）
+│   ├── test_deal_stacking.py    # ⭐ 券叠加规则（24 项，守算价准确性）
 │   ├── test_smoke.py            # 业务逻辑冒烟（27 项）
 │   ├── test_live_transport.py   # MCP 传输层协议（30 项，含本地假服务端）
 │   └── test_e2e_fake_server.py  # 拟真服务端上的完整点餐链路（13 项）
@@ -283,12 +284,13 @@ McD_MentalCare_Buddy/
 ## 🧪 测试
 
 ```bash
-python tests/run_all.py          # 全部四套，共 125 项断言
+python tests/run_all.py          # 全部五套，共 149 项断言
 ```
 
 | 套件                        |  断言 | 覆盖                                                                         |
 | ------------------------- | :-: | -------------------------------------------------------------------------- |
 | `test_safety.py`          |  55 | ⭐ 心理危机三档判定、告别式不降档、**CRISIS 不得产生点餐内容**、文体强制降级、热线完整性 |
+| `test_deal_stacking.py`   |  24 | ⭐ 不可叠加券不得被组合、互斥组、第二份半价开关、真实 Mock 券数据、排除原因透明化 |
 | `test_smoke.py`           |  27 | 情绪识别（直述/反讽/时间上下文）、RP 套餐打分（咖啡因反例）、券组合与凑单、安全闸门                               |
 | `test_live_transport.py`  |  30 | 握手、纯 JSON / SSE 双信封、429 退避重试、会话失效自愈、toon 解析、tools/list 差分、doctor 自检、写接口禁降级 |
 | `test_e2e_fake_server.py` |  13 | 在拟真服务端（菜单不带口味字段）跑完整 `main.run()`，验证标注层把 RP 从 2.4 拉到 55.2                   |

@@ -295,7 +295,7 @@ python main.py "被气死了" --live --auto-mock # 真接口挂了自动降级�
 | 业务逻辑 | `python tests/test_smoke.py` | 情绪识别 / RP 打分 / 凑单 / 安全闸门 |
 | 传输协议 | `python tests/test_live_transport.py` | 握手 / SSE / 429 退避 / 会话自愈 / toon / Tool 差分 |
 | 全链路 | `python tests/test_e2e_fake_server.py` | 在拟真服务端上跑完整 `main.run()` |
-| **一键全跑** | `python tests/run_all.py` | 以上四套，**共 125 项断言** |
+| **一键全跑** | `python tests/run_all.py` | 以上五套，**共 149 项断言** |
 
 > 后两个套件用 **本地假 MCP Server**（`ThreadingHTTPServer`）复刻官方协议行为，
 > 包括故意返回 429 / 404 来逼出重试与自愈逻辑 —— 所以 CI、断网、答辩现场都能跑。

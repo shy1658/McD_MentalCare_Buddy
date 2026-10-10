@@ -177,6 +177,14 @@ class Coupon:
     item_codes: list[str] = field(default_factory=list)
     categories: list[str] = field(default_factory=list)
     stackable: bool = True
+    """能否与其他券同时使用。False = 只能单独使用（大额券常见）。"""
+
+    exclusive_group: str = ""
+    """
+    互斥组：同一组内最多选一张。官方字段名为 `exclusiveGroup`，
+    为空表示不属于任何互斥组。
+    """
+
     expires_at: str = ""
 
     def applies_to(self, item: MenuItem) -> bool:
@@ -199,6 +207,9 @@ class Coupon:
             item_codes=list(d.get("item_codes") or d.get("itemCodes") or []),
             categories=list(d.get("categories") or []),
             stackable=bool(d.get("stackable", True)),
+            exclusive_group=str(
+                d.get("exclusive_group") or d.get("exclusiveGroup") or ""
+            ),
             expires_at=str(d.get("expires_at") or d.get("expireTime") or ""),
         )
 

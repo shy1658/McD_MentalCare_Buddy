@@ -154,7 +154,7 @@ python skill/scripts/main.py --doctor --live       # 针对真实 MCP
 |---|---|---|
 | `create_order` 返回键名 | `orderId` / `payUrl` / `pickupCode` 为推测 | 下单后展示字段可能错位 |
 | `now_time_info` 返回格式 | 假设含 `datetime` 键，`%Y-%m-%d %H:%M:%S` | 解析失败会静默兜住，但时间上下文失效 |
-| 券 `stackable` 字段 | 硬编码 True | 若实际不可叠加，**算出的价格是错的** |
+| ~~券 `stackable` 字段~~ | ✅ 已修复（P1-4） | 现逐券读取 `stackable` / `exclusiveGroup`，见 `deal_calculator.stacking_allowed()` |
 | 营养表匹配 | 按商品名精确匹配 | 真实菜单带规格后缀时可能缺失 |
 
 > 拿到真 Token 后跑一次 `python main.py "加班" --live --verbose`，

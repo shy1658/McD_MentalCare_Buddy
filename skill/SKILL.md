@@ -259,11 +259,13 @@ python <SKILL_DIR>/scripts/main.py "被气死了" --confirm        # ⚠️ 真�
 ## 10. 测试
 
 ```bash
-python <ROOT>/tests/run_all.py       # 125 项断言，免 Token、免网络
+python <ROOT>/tests/run_all.py       # 149 项断言，免 Token、免网络
 ```
 
-四个套件：`test_safety.py`（**心理危机干预 55 项，安全底线，失败即 P0**）、
-`test_smoke.py`（业务逻辑 27 项）、`test_live_transport.py`（本地假服务端验传输协议 30 项，含 429/404 故障注入）、
+五个套件：`test_safety.py`（**心理危机干预 55 项，安全底线，失败即 P0**）、
+`test_deal_stacking.py`（**券叠加规则 24 项，守算价准确性**）、
+`test_smoke.py`（业务逻辑 27 项）、
+`test_live_transport.py`（本地假服务端验传输协议 30 项，含 429/404 故障注入）、
 `test_e2e_fake_server.py`（拟真服务端跑完整流程 13 项）。
 
 ---
@@ -281,7 +283,6 @@ python <ROOT>/tests/run_all.py       # 125 项断言，免 Token、免网络
 
 ## 12. 已知限制（诚实清单）
 
-- `stackable` 目前硬编码为 True，真实券若不可叠加需从券详情读取（接真 Token 后第一优先级）
 - 营养表按商品名精确匹配，真实菜单带规格后缀（如「可乐(中杯)」）时可能缺失
 - `create_order` 返回的 `orderId` / `payUrl` / `pickupCode` 键名待真实数据回填
 - 海报 PNG、续命账单、Web Demo 在路线图中，未实现

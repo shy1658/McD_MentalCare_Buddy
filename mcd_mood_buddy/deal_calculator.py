@@ -47,13 +47,19 @@ DELIVERY_FEE = 6.0
 @dataclass
 class StackPolicy:
     """
-    券叠加规则。
+    券叠加规则 —— **数量上限与全局开关**。
 
-    ⚠️ 麦当劳实际规则会随活动变化，这里给出保守默认：
-       主券（满减 / 折扣 / 套餐）只能用一张，单品券可用一张，第二份半价可叠加。
+    注意职责划分（这一点很重要）：
+      * 「某张券自己能不能叠加」由 `Coupon.stackable` / `Coupon.exclusive_group`
+        决定，逐券读取，**不在这里硬编码**；
+      * 本类只负责「一个组合里最多几张券」这类全局策略。
 
-    TODO(real-mcp): 接真实接口后，应从券详情里读 stackable / exclusiveGroup 字段，
-                    而不是依赖这里的硬编码假设。
+    早期版本把两者混在一起（只看策略、不看券自身的 stackable），
+    结果是一张明确标注「不可叠加」的大额券仍会被拿去和其他券组合，
+    算出来的价格比实际能付的低 —— 这是唯一会直接误导用户多花钱的缺陷，
+    因此单独修掉并加了测试。
+
+    默认值为保守设定：主券一张、单品券一张。
     """
 
     max_main: int = 1          # 满减 / 折扣 / 套餐券最多用几张
@@ -65,6 +71,63 @@ class StackPolicy:
 
 # 主券类型：互斥的那一组
 _MAIN_KINDS = (CouponKind.THRESHOLD, CouponKind.PERCENT, CouponKind.COMBO)
+
+
+def stacking_allowed(used: list[Coupon], policy: StackPolicy) -> tuple[bool, str]:
+    """
+    校验一组券能否同时使用。
+
+    规则（按优先级）：
+      1. 只用一张券 → 永远合法（不管它 stackable 与否）
+      2. 多张券时，**每一张**都必须是 `stackable=True`
+      3. 同 `exclusive_group` 内最多一张
+      4. 受 `policy.max_main` / `max_item` 数量上限约束
+      5. `policy.second_half_stackable=False` 时，第二份半价不能参与多券组合
+
+    Returns:
+        (是否合法, 不合法原因)
+
+    Examples:
+        >>> a = Coupon("A", "满30减5", CouponKind.THRESHOLD, stackable=True)
+        >>> b = Coupon("B", "大额券", CouponKind.THRESHOLD, stackable=False)
+        >>> stacking_allowed([a, b], StackPolicy())[0]
+        False
+        >>> stacking_allowed([b], StackPolicy())[0]
+        True
+    """
+    if len(used) <= 1:
+        return True, ""
+
+    # ① 不可叠加券：只能独占
+    for c in used:
+        if not c.stackable:
+            return False, f"「{c.name}」不可与其他券叠加"
+
+    # ② 互斥组
+    groups: dict[str, list[Coupon]] = {}
+    for c in used:
+        if c.exclusive_group:
+            groups.setdefault(c.exclusive_group, []).append(c)
+    for grp, members in groups.items():
+        if len(members) > 1:
+            names = "、".join(m.name for m in members)
+            return False, f"互斥组「{grp}」内只能选一张（{names}）"
+
+    # ③ 数量上限
+    n_main = sum(1 for c in used if c.kind in _MAIN_KINDS)
+    n_item = sum(1 for c in used if c.kind == CouponKind.ITEM)
+    if n_main > policy.max_main:
+        return False, f"满减/折扣类券最多 {policy.max_main} 张"
+    if n_item > policy.max_item:
+        return False, f"单品券最多 {policy.max_item} 张"
+
+    # ④ 第二份半价的全局开关（仅在与其他券同用时才构成冲突）
+    if not policy.second_half_stackable and any(
+        c.kind == CouponKind.SECOND_HALF for c in used
+    ):
+        return False, "第二份半价券当前不可与其他券叠加"
+
+    return True, ""
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +142,8 @@ class _Eval:
     discount: float = 0.0
     explain: list[str] = field(default_factory=list)
     used: list[Coupon] = field(default_factory=list)
+    invalid: bool = False          # 违反叠加规则 → 调用方应跳过该组合
+    invalid_reason: str = ""
 
 
 def _subtotal(lines: list[CartLine]) -> float:
@@ -154,7 +219,14 @@ def _evaluate(
     policy: StackPolicy,
     dine_mode: DineMode,
 ) -> _Eval:
-    """评估一个券组合下的总减免"""
+    """
+    评估一个券组合下的总减免。
+
+    ⚠️ 先算减免、**再校验叠加合法性**：
+    若组合违反 `stackable` / `exclusive_group`，返回 `invalid=True`，
+    由调用方直接跳过。这比"算完再用"更重要 —— 非法组合算出来的
+    减免额会比用户实际能付的低，属于会误导消费的错误，绝不能输出。
+    """
     subtotal = _subtotal(lines)
     codes = {ln.item.code for ln in lines}
 
@@ -164,12 +236,18 @@ def _evaluate(
         off_item, note_item = 0.0, ""
     off_half, notes_half, used_half = _apply_second_half(second_half, lines)
 
+    used = [c for c in [main, item_coupon] if c] + used_half
+
+    # --- 叠加规则校验（逐券读取，不看策略里的硬编码假设）---
+    ok, why = stacking_allowed(used, policy)
+    if not ok:
+        return _Eval(invalid=True, invalid_reason=why, used=used)
+
     discount = round(off_main + off_item + off_half, 2)
     # 减免不能超过商品总额
     discount = min(discount, subtotal)
 
     explain = [n for n in [note_main, note_item, *notes_half] if n]
-    used = [c for c in [main, item_coupon] if c] + used_half
     return _Eval(discount=discount, explain=explain, used=used)
 
 
@@ -291,13 +369,13 @@ def optimize(
 
     mains = [c for c in coupons if c.kind in _MAIN_KINDS]
     item_coupons = [c for c in coupons if c.kind == CouponKind.ITEM]
-    halves = (
-        [c for c in coupons if c.kind == CouponKind.SECOND_HALF]
-        if policy.second_half_stackable
-        else []
-    )
+    # 第二份半价券始终进候选：能否与其他券同用交给 stacking_allowed 判定。
+    # （早期版本在这里就用 policy 一次性过滤掉，等于"不可叠加"时连单独用都不许，
+    #   把一张本来能省钱的券直接扔了。）
+    halves = [c for c in coupons if c.kind == CouponKind.SECOND_HALF]
 
     best: DealResult | None = None
+    skipped_invalid: list[str] = []   # 因叠加规则被排除的组合原因（去重后展示）
 
     # --- 枚举「主券 × 单品券」 ---
     main_choices: list[Coupon | None] = [None] + mains
@@ -310,6 +388,10 @@ def optimize(
                 continue
 
             ev = _evaluate(lines, main, ic, halves, policy, dine_mode)
+            # ⭐ 违反叠加规则的组合直接跳过 —— 宁可少省，不能算错
+            if ev.invalid:
+                skipped_invalid.append(ev.invalid_reason)
+                continue
             deal = _to_deal(lines, ev, dine_mode)
 
             # --- 凑单：仅当主券是满减且未达门槛时才可能有利可图 ---
@@ -320,6 +402,8 @@ def optimize(
                     for filler in _find_fillers(gap, lines, menu, ranked):
                         new_lines = _add_filler(lines, filler)
                         ev2 = _evaluate(new_lines, main, ic, halves, policy, dine_mode)
+                        if ev2.invalid:
+                            continue
                         deal2 = _to_deal(new_lines, ev2, dine_mode, filler=filler)
                         # 凑单后比原方案更便宜才算赚到
                         saving = deal.payable - deal2.payable
@@ -344,6 +428,16 @@ def optimize(
         trimmed = _trim_to_budget(lines, coupons, policy, dine_mode, budget)
         if trimmed is not None:
             best = trimmed
+
+    # 透明化：如果有券因叠加规则没用上，告诉用户"为什么没省更多"。
+    # 不解释的话，用户会以为系统漏算了 —— 沉默在这里等于被怀疑。
+    # 放在最后，避免被预算裁剪的分支覆盖掉。
+    if skipped_invalid:
+        uniq = list(dict.fromkeys(skipped_invalid))
+        best.explain.append(
+            "以下组合因券的叠加规则被排除（避免算出无法实际使用的价格）："
+            + "；".join(uniq[:2])
+        )
 
     return best
 
