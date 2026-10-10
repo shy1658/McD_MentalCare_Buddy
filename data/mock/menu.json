@@ -1,0 +1,137 @@
+[
+  {
+    "code": "ANGUS_BEEF", "name": "安格斯厚牛堡", "category": "堡",
+    "price": 38.0, "tags": ["限定", "牛肉"], "kcal": 780, "prep_seconds": 200,
+    "flavor": {"salty": 0.95, "chewy": 0.7, "sweet": 0.1, "caffeine": 0.0}
+  },
+  {
+    "code": "SPICY_CHICKEN", "name": "麦辣鸡腿堡", "category": "堡",
+    "price": 22.0, "tags": ["辣", "经典"], "kcal": 570, "prep_seconds": 150,
+    "flavor": {"salty": 0.85, "chewy": 0.75, "sweet": 0.1, "caffeine": 0.0}
+  },
+  {
+    "code": "BIG_MAC", "name": "巨无霸", "category": "堡",
+    "price": 25.0, "tags": ["经典"], "kcal": 550, "prep_seconds": 150,
+    "flavor": {"salty": 0.9, "chewy": 0.5, "sweet": 0.1, "caffeine": 0.0}
+  },
+  {
+    "code": "GRILLED_CHICKEN", "name": "板烧鸡腿堡", "category": "堡",
+    "price": 21.0, "tags": ["经典"], "kcal": 480, "prep_seconds": 150,
+    "flavor": {"salty": 0.8, "chewy": 0.5, "sweet": 0.15, "caffeine": 0.0}
+  },
+  {
+    "code": "MAZALA_CHICKEN", "name": "麻辣板烧鸡腿堡", "category": "堡",
+    "price": 24.0, "tags": ["限定", "新品", "辣"], "kcal": 520, "prep_seconds": 170,
+    "flavor": {"salty": 0.85, "chewy": 0.6, "sweet": 0.1, "caffeine": 0.0}
+  },
+  {
+    "code": "MCCHICKEN", "name": "麦香鸡", "category": "堡",
+    "price": 17.0, "tags": ["经典"], "kcal": 400, "prep_seconds": 120,
+    "flavor": {"salty": 0.75, "chewy": 0.45, "sweet": 0.1, "caffeine": 0.0}
+  },
+  {
+    "code": "FILET_O_FISH", "name": "麦香鱼", "category": "堡",
+    "price": 18.0, "tags": ["经典"], "kcal": 430, "prep_seconds": 120,
+    "flavor": {"salty": 0.7, "chewy": 0.4, "sweet": 0.1, "caffeine": 0.0}
+  },
+
+  {
+    "code": "SPICY_WINGS_2", "name": "麦辣鸡翅(2块)", "category": "小食",
+    "price": 13.0, "tags": ["辣", "酥脆"], "kcal": 260, "prep_seconds": 120,
+    "flavor": {"salty": 0.8, "chewy": 1.0, "sweet": 0.1, "caffeine": 0.0}
+  },
+  {
+    "code": "SPICY_WINGS_10", "name": "麦辣鸡翅(10块)", "category": "小食",
+    "price": 49.0, "tags": ["辣", "酥脆", "分享装"], "kcal": 1300, "prep_seconds": 180,
+    "flavor": {"salty": 0.8, "chewy": 1.0, "sweet": 0.1, "caffeine": 0.0}
+  },
+  {
+    "code": "FRIES_L", "name": "大薯条", "category": "小食",
+    "price": 12.0, "tags": ["薯条"], "kcal": 500, "prep_seconds": 90,
+    "flavor": {"salty": 0.75, "chewy": 0.35, "sweet": 0.05, "caffeine": 0.0}
+  },
+  {
+    "code": "FRIES_M", "name": "中薯条", "category": "小食",
+    "price": 10.0, "tags": ["薯条"], "kcal": 380, "prep_seconds": 90,
+    "flavor": {"salty": 0.75, "chewy": 0.35, "sweet": 0.05, "caffeine": 0.0}
+  },
+  {
+    "code": "NUGGETS_5", "name": "麦乐鸡(5块)", "category": "小食",
+    "price": 14.0, "tags": ["酥脆"], "kcal": 290, "prep_seconds": 110,
+    "flavor": {"salty": 0.75, "chewy": 0.8, "sweet": 0.05, "caffeine": 0.0}
+  },
+  {
+    "code": "CORN_CUP", "name": "玉米杯", "category": "小食",
+    "price": 8.0, "tags": ["清爽", "低负担"], "kcal": 130, "prep_seconds": 60,
+    "flavor": {"salty": 0.3, "chewy": 0.2, "sweet": 0.5, "caffeine": 0.0}
+  },
+  {
+    "code": "CHICKEN_BOX", "name": "麦麦脆汁鸡分享盒", "category": "小食",
+    "price": 59.0, "tags": ["分享装", "酥脆"], "kcal": 1600, "prep_seconds": 240,
+    "flavor": {"salty": 0.85, "chewy": 0.95, "sweet": 0.1, "caffeine": 0.0}
+  },
+
+  {
+    "code": "ICED_AMERICANO_L", "name": "大杯冰美式", "category": "饮品",
+    "price": 12.0, "tags": ["咖啡"], "kcal": 15, "prep_seconds": 60,
+    "flavor": {"salty": 0.0, "chewy": 0.0, "sweet": 0.05, "caffeine": 1.0}
+  },
+  {
+    "code": "ICED_LATTE", "name": "冰拿铁", "category": "饮品",
+    "price": 16.0, "tags": ["咖啡"], "kcal": 120, "prep_seconds": 80,
+    "flavor": {"salty": 0.05, "chewy": 0.0, "sweet": 0.35, "caffeine": 0.9}
+  },
+  {
+    "code": "COKE_M", "name": "中杯可乐", "category": "饮品",
+    "price": 8.0, "tags": ["碳酸"], "kcal": 140, "prep_seconds": 45,
+    "flavor": {"salty": 0.0, "chewy": 0.0, "sweet": 0.75, "caffeine": 0.25}
+  },
+  {
+    "code": "COKE_ZERO", "name": "无糖可乐", "category": "饮品",
+    "price": 8.0, "tags": ["碳酸", "低负担"], "kcal": 0, "prep_seconds": 45,
+    "flavor": {"salty": 0.0, "chewy": 0.0, "sweet": 0.5, "caffeine": 0.3}
+  },
+  {
+    "code": "ORANGE_JUICE", "name": "橙汁", "category": "饮品",
+    "price": 10.0, "tags": ["果汁"], "kcal": 120, "prep_seconds": 45,
+    "flavor": {"salty": 0.0, "chewy": 0.0, "sweet": 0.85, "caffeine": 0.0}
+  },
+
+  {
+    "code": "MCFLURRY", "name": "麦旋风(原味)", "category": "甜品",
+    "price": 9.0, "tags": ["冰淇淋"], "kcal": 320, "prep_seconds": 60,
+    "flavor": {"salty": 0.05, "chewy": 0.25, "sweet": 1.0, "caffeine": 0.0}
+  },
+  {
+    "code": "SUNDAE_CHOC", "name": "巧克力新地", "category": "甜品",
+    "price": 8.0, "tags": ["冰淇淋"], "kcal": 300, "prep_seconds": 60,
+    "flavor": {"salty": 0.05, "chewy": 0.2, "sweet": 1.0, "caffeine": 0.0}
+  },
+  {
+    "code": "APPLE_PIE", "name": "菠萝派", "category": "甜品",
+    "price": 7.0, "tags": ["派", "酥脆"], "kcal": 240, "prep_seconds": 90,
+    "flavor": {"salty": 0.1, "chewy": 0.5, "sweet": 0.9, "caffeine": 0.0}
+  },
+  {
+    "code": "SOFT_CONE", "name": "甜筒", "category": "甜品",
+    "price": 5.0, "tags": ["冰淇淋"], "kcal": 150, "prep_seconds": 40,
+    "flavor": {"salty": 0.05, "chewy": 0.15, "sweet": 0.95, "caffeine": 0.0}
+  },
+
+  {
+    "code": "MCMUFFIN_PORK", "name": "猪柳麦满分", "category": "早餐",
+    "price": 14.0, "tags": ["早餐"], "kcal": 308, "prep_seconds": 100,
+    "flavor": {"salty": 0.8, "chewy": 0.4, "sweet": 0.1, "caffeine": 0.0}
+  },
+  {
+    "code": "HASH_BROWN", "name": "薯饼", "category": "早餐",
+    "price": 6.0, "tags": ["早餐", "薯饼"], "kcal": 150, "prep_seconds": 60,
+    "flavor": {"salty": 0.65, "chewy": 0.45, "sweet": 0.05, "caffeine": 0.0}
+  },
+
+  {
+    "code": "COMBO_1P1", "name": "1+1随心配", "category": "套餐",
+    "price": 13.9, "tags": ["随心配", "性价比"], "kcal": 600, "prep_seconds": 120,
+    "flavor": {"salty": 0.75, "chewy": 0.55, "sweet": 0.25, "caffeine": 0.1}
+  }
+]

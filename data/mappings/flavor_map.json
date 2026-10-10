@@ -1,0 +1,38 @@
+{
+  "version": "1.0",
+  "_comment": "真实 MCP 返回的菜单只有「名称/分类/编码/价格」，没有口味向量。本表负责本地补齐 —— 这是 RP 公式能在真实数据上跑起来的前提。匹配优先级：exact > keyword（自上而下首个命中） > category > default。",
+
+  "exact": {
+    "麦香鱼": { "flavor": { "salty": 0.6, "chewy": 0.4, "sweet": 0.2, "caffeine": 0.0 }, "prep_seconds": 140 },
+    "麦辣鸡翅": { "flavor": { "salty": 0.9, "chewy": 1.0, "sweet": 0.1, "caffeine": 0.0 }, "prep_seconds": 110 },
+    "板烧鸡腿堡": { "flavor": { "salty": 0.85, "chewy": 0.6, "sweet": 0.2, "caffeine": 0.0 }, "prep_seconds": 160 },
+    "麦旋风": { "flavor": { "salty": 0.0, "chewy": 0.1, "sweet": 1.0, "caffeine": 0.0 }, "prep_seconds": 40 }
+  },
+
+  "keyword": [
+    { "contains": ["拿铁", "美式", "澳白", "卡布奇诺", "espresso"], "flavor": { "salty": 0.1, "chewy": 0.0, "sweet": 0.4, "caffeine": 1.0 }, "prep_seconds": 70 },
+    { "contains": ["咖啡"], "flavor": { "salty": 0.1, "chewy": 0.0, "sweet": 0.4, "caffeine": 0.95 }, "prep_seconds": 70 },
+    { "contains": ["红茶", "锡兰", "乌龙", "茶"], "flavor": { "salty": 0.0, "chewy": 0.0, "sweet": 0.5, "caffeine": 0.45 }, "prep_seconds": 50 },
+    { "contains": ["可乐", "雪碧", "芬达", "苏打"], "flavor": { "salty": 0.0, "chewy": 0.0, "sweet": 1.0, "caffeine": 0.1 }, "prep_seconds": 20 },
+    { "contains": ["奶茶", "阿华田", "热朱古力", "可可"], "flavor": { "salty": 0.1, "chewy": 0.0, "sweet": 0.9, "caffeine": 0.2 }, "prep_seconds": 60 },
+    { "contains": ["豆浆", "牛奶", "椰"], "flavor": { "salty": 0.1, "chewy": 0.0, "sweet": 0.5, "caffeine": 0.0 }, "prep_seconds": 30 },
+    { "contains": ["漩", "新地", "圣代", "甜筒", "冰淇淋", "雪糕"], "flavor": { "salty": 0.0, "chewy": 0.1, "sweet": 1.0, "caffeine": 0.0 }, "prep_seconds": 40 },
+    { "contains": ["派", "蛋糕", "麻薯", "甜筒座"], "flavor": { "salty": 0.1, "chewy": 0.3, "sweet": 0.9, "caffeine": 0.0 }, "prep_seconds": 45 },
+    { "contains": ["薯条", "薯格", "摇摇薯"], "flavor": { "salty": 0.7, "chewy": 0.85, "sweet": 0.1, "caffeine": 0.0 }, "prep_seconds": 90 },
+    { "contains": ["鸡块", "鸡翅", "脆鸡", "鸡排", "洋葱圈"], "flavor": { "salty": 0.85, "chewy": 0.95, "sweet": 0.1, "caffeine": 0.0 }, "prep_seconds": 110 },
+    { "contains": ["堡", "卷", "汉堡"], "flavor": { "salty": 0.9, "chewy": 0.7, "sweet": 0.2, "caffeine": 0.0 }, "prep_seconds": 155 },
+    { "contains": ["沙拉", "蔬菜", "玉米"], "flavor": { "salty": 0.25, "chewy": 0.2, "sweet": 0.3, "caffeine": 0.0 }, "prep_seconds": 60 },
+    { "contains": ["粥", "燕麦", "麦满分", "吉士蛋"], "flavor": { "salty": 0.6, "chewy": 0.35, "sweet": 0.3, "caffeine": 0.0 }, "prep_seconds": 120 }
+  ],
+
+  "category": {
+    "汉堡": { "flavor": { "salty": 0.85, "chewy": 0.7, "sweet": 0.2, "caffeine": 0.0 }, "prep_seconds": 155 },
+    "小食": { "flavor": { "salty": 0.8, "chewy": 0.9, "sweet": 0.1, "caffeine": 0.0 }, "prep_seconds": 100 },
+    "饮料": { "flavor": { "salty": 0.0, "chewy": 0.0, "sweet": 0.85, "caffeine": 0.1 }, "prep_seconds": 30 },
+    "咖啡": { "flavor": { "salty": 0.1, "chewy": 0.0, "sweet": 0.4, "caffeine": 1.0 }, "prep_seconds": 70 },
+    "甜品": { "flavor": { "salty": 0.0, "chewy": 0.2, "sweet": 1.0, "caffeine": 0.0 }, "prep_seconds": 40 },
+    "早餐": { "flavor": { "salty": 0.65, "chewy": 0.4, "sweet": 0.35, "caffeine": 0.0 }, "prep_seconds": 120 }
+  },
+
+  "default": { "flavor": { "salty": 0.5, "chewy": 0.5, "sweet": 0.4, "caffeine": 0.1 }, "prep_seconds": 120 }
+}

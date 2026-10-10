@@ -1,0 +1,62 @@
+[
+  {
+    "couponId": "C_TH40_8", "name": "满40减8", "kind": "threshold",
+    "threshold": 40.0, "discount": 8.0, "stackable": true,
+    "claimable": true, "usable": true, "expires_at": "2026-10-20"
+  },
+  {
+    "couponId": "C_TH30_5", "name": "满30减5", "kind": "threshold",
+    "threshold": 30.0, "discount": 5.0, "stackable": true,
+    "claimable": true, "usable": true, "expires_at": "2026-10-18"
+  },
+  {
+    "couponId": "C_TH55_12", "name": "满55减12", "kind": "threshold",
+    "threshold": 55.0, "discount": 12.0, "stackable": true,
+    "claimable": true, "usable": true, "expires_at": "2026-10-25"
+  },
+  {
+    "couponId": "C_NIGHT_35_10", "name": "夜宵套餐券(满35减10)", "kind": "threshold",
+    "threshold": 35.0, "discount": 10.0, "stackable": true,
+    "claimable": true, "usable": true, "expires_at": "2026-10-15"
+  },
+  {
+    "couponId": "C_P85", "name": "全场85折(满25可用)", "kind": "percent",
+    "threshold": 25.0, "rate": 0.85, "stackable": false,
+    "claimable": true, "usable": true, "expires_at": "2026-10-16"
+  },
+  {
+    "couponId": "C_ITEM_WINGS", "name": "麦辣鸡翅立减5", "kind": "item",
+    "discount": 5.0, "item_codes": ["SPICY_WINGS_2", "SPICY_WINGS_10"],
+    "stackable": true, "claimable": true, "usable": true, "expires_at": "2026-10-22"
+  },
+  {
+    "couponId": "C_ITEM_ANGUS", "name": "安格斯厚牛堡立减6", "kind": "item",
+    "discount": 6.0, "item_codes": ["ANGUS_BEEF"],
+    "stackable": true, "claimable": true, "usable": true, "expires_at": "2026-10-19"
+  },
+  {
+    "couponId": "C_ITEM_AMERICANO", "name": "冰美式立减3", "kind": "item",
+    "discount": 3.0, "item_codes": ["ICED_AMERICANO_L"],
+    "stackable": true, "claimable": true, "usable": true, "expires_at": "2026-10-20"
+  },
+  {
+    "couponId": "C_HALF_WINGS", "name": "麦辣鸡翅第二份半价", "kind": "second_half",
+    "rate": 0.5, "item_codes": ["SPICY_WINGS_2", "SPICY_WINGS_10"],
+    "stackable": true, "claimable": true, "usable": true, "expires_at": "2026-10-21"
+  },
+  {
+    "couponId": "C_HALF_DRINK", "name": "饮品第二份半价", "kind": "second_half",
+    "rate": 0.5, "categories": ["饮品"],
+    "stackable": true, "claimable": true, "usable": true, "expires_at": "2026-10-21"
+  },
+  {
+    "couponId": "C_COMBO_1P1", "name": "1+1随心配立减3", "kind": "combo",
+    "discount": 3.0, "item_codes": ["COMBO_1P1"],
+    "stackable": true, "claimable": false, "usable": true, "expires_at": "2026-10-30"
+  },
+  {
+    "couponId": "C_EXPIRED", "name": "已过期测试券(满20减10)", "kind": "threshold",
+    "threshold": 20.0, "discount": 10.0,
+    "claimable": false, "usable": false, "expires_at": "2026-09-01"
+  }
+]

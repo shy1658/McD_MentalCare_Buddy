@@ -1,0 +1,20 @@
+# 统一换行符 —— 避免 Windows / macOS / Linux 协作时产生满屏 diff 噪音
+# 仓库内一律存 LF，检出时按各平台习惯转换
+* text=auto eol=lf
+
+# 文本类：明确声明，防止被误判为二进制
+*.py   text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+*.txt  text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+
+# 二进制类：绝不转换（后续放 demo.gif / 海报 PNG 时不会损坏）
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary

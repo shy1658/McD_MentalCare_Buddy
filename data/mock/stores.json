@@ -1,0 +1,17 @@
+[
+  {
+    "storeId": "S001", "name": "麦当劳科技园店",
+    "address": "科技园南区高新南一道 1 号",
+    "distance_m": 420, "open_now": true, "supports_delivery": true
+  },
+  {
+    "storeId": "S002", "name": "麦当劳地铁口店",
+    "address": "深南大道地铁 A 出口 B1 层",
+    "distance_m": 850, "open_now": true, "supports_delivery": false
+  },
+  {
+    "storeId": "S003", "name": "麦当劳总部大厦店",
+    "address": "中心路 88 号 1 楼",
+    "distance_m": 1600, "open_now": false, "supports_delivery": true
+  }
+]
